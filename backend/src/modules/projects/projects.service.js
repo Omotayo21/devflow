@@ -1,5 +1,6 @@
 import { db } from '../../db/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { getOrSet, invalidate, invalidatePattern } from '../../utils/cache.js';
 
 export async function createProject({ name, description, workspaceId }, userId) {
   // Verify user is a member of this workspace
@@ -12,7 +13,6 @@ export async function createProject({ name, description, workspaceId }, userId) 
   if (member.rows.length === 0) {
     throw new AppError('You are not a member of this workspace', 403);
   }
-
   const result = await db.query(
     `INSERT INTO projects (name, description, workspace_id, created_by)
      VALUES ($1, $2, $3, $4)
@@ -20,36 +20,31 @@ export async function createProject({ name, description, workspaceId }, userId) 
     [name, description, workspaceId, userId]
   );
 
+  await invalidate(`projects:workspace:${workspaceId}`);
   return result.rows[0];
 }
 
 export async function getWorkspaceProjects(workspaceId, userId) {
-  // Verify membership
-  const member = await db.query(
-    `SELECT id FROM workspace_members 
-     WHERE workspace_id = $1 AND user_id = $2`,
-    [workspaceId, userId]
+  return getOrSet(
+    `projects:workspace:${workspaceId}`,
+    async () => {
+      const result = await db.query(
+        `SELECT 
+          p.*,
+          u.name AS created_by_name,
+          COUNT(DISTINCT t.id) AS task_count
+         FROM projects p
+         JOIN users u ON p.created_by = u.id
+         LEFT JOIN tasks t ON p.id = t.project_id
+         WHERE p.workspace_id = $1
+         GROUP BY p.id, u.name
+         ORDER BY p.created_at DESC`,
+        [workspaceId]
+      );
+      return result.rows;
+    },
+    300
   );
-
-  if (member.rows.length === 0) {
-    throw new AppError('Access denied', 403);
-  }
-
-  const result = await db.query(
-    `SELECT 
-      p.*,
-      u.name AS created_by_name,
-      COUNT(DISTINCT t.id) AS task_count
-     FROM projects p
-     JOIN users u ON p.created_by = u.id
-     LEFT JOIN tasks t ON p.id = t.project_id
-     WHERE p.workspace_id = $1
-     GROUP BY p.id, u.name
-     ORDER BY p.created_at DESC`,
-    [workspaceId]
-  );
-
-  return result.rows;
 }
 
 export async function getProjectById(projectId, userId) {

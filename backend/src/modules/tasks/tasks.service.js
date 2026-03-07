@@ -1,6 +1,8 @@
 import { db } from '../../db/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { logActivity } from '../../utils/activity.js';
+import { emailQueue } from '../../config/queue.js';
+import { invalidate } from '../../utils/cache.js';
 
 async function verifyProjectAccess(projectId, userId) {
   const result = await db.query(
@@ -144,7 +146,39 @@ export async function updateTask(taskId, updates, userId) {
      RETURNING *`,
     [title, description, status, priority, assigneeId, dueDate, taskId]
   );
-const project = await db.query(
+
+  // If task was assigned to someone, queue notification email
+  if (assigneeId && assigneeId !== task.rows[0].assignee_id) {
+    const assignee = await db.query(
+      'SELECT name, email FROM users WHERE id = $1',
+      [assigneeId]
+    );
+
+    const assigner = await db.query(
+      'SELECT name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const projectData = await db.query(
+      'SELECT name FROM projects WHERE id = $1',
+      [task.rows[0].project_id]
+    );
+
+    if (assignee.rows[0]) {
+      await emailQueue.add('task.assigned', {
+        type: 'task.assigned',
+        data: {
+          assigneeName: assignee.rows[0].name,
+          assigneeEmail: assignee.rows[0].email,
+          taskTitle: result.rows[0].title,
+          projectName: projectData.rows[0].name,
+          assignedByName: assigner.rows[0].name,
+        },
+      });
+    }
+  }
+
+  const project = await db.query(
   'SELECT workspace_id FROM projects WHERE id = $1',
   [task.rows[0].project_id]
 );
@@ -174,6 +208,7 @@ export async function deleteTask(taskId, userId) {
   }
 
   await db.query('DELETE FROM tasks WHERE id = $1', [taskId]);
+  await invalidate(`projects:workspace:${task.rows[0].workspace_id}`);
   return { message: 'Task deleted successfully' };
 }
 export async function createComment({ content, taskId }, userId) {

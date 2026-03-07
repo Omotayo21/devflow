@@ -2,6 +2,7 @@ import 'dotenv/config';
 import app from './src/app.js';
 import { config } from './src/config/index.js';
 import { logger } from './src/utils/logger.js';
+import './src/config/queue.js';
 
 const server = app.listen(config.port, () => {
   logger.info(`Server running on port ${config.port} in ${config.nodeEnv} mode`);

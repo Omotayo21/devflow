@@ -1,11 +1,9 @@
 import { db } from '../../db/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { logActivity } from '../../utils/activity.js';
+import { getOrSet, invalidate, invalidatePattern } from '../../utils/cache.js';
 
 export async function createWorkspace({ name, description }, userId) {
-  // Use a transaction — both queries must succeed or neither does
-  // If workspace creates but member insert fails, we'd have an
-  // ownerless workspace. Transaction prevents that.
   const client = await db.getClient();
 
   try {
@@ -20,7 +18,6 @@ export async function createWorkspace({ name, description }, userId) {
 
     const workspace = workspaceResult.rows[0];
 
-    // Automatically add creator as owner member
     await client.query(
       `INSERT INTO workspace_members (workspace_id, user_id, role)
        VALUES ($1, $2, 'owner')`,
@@ -28,53 +25,62 @@ export async function createWorkspace({ name, description }, userId) {
     );
 
     await client.query('COMMIT');
+
+    await invalidate(`workspaces:user:${userId}`);
+
     return workspace;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
-    client.release(); // always return client to pool
+    client.release();
   }
 }
 
 export async function getUserWorkspaces(userId) {
-  const result = await db.query(
-    `SELECT 
-      w.*,
-      wm.role AS my_role,
-      COUNT(DISTINCT wm2.user_id) AS member_count
-     FROM workspaces w
-     JOIN workspace_members wm ON w.id = wm.workspace_id
-     LEFT JOIN workspace_members wm2 ON w.id = wm2.workspace_id
-     WHERE wm.user_id = $1
-     GROUP BY w.id, wm.role
-     ORDER BY w.created_at DESC`,
-    [userId]
+  return getOrSet(
+    `workspaces:user:${userId}`,
+    async () => {
+      const result = await db.query(
+        `SELECT 
+          w.*,
+          wm.role AS my_role,
+          COUNT(DISTINCT wm2.user_id) AS member_count
+         FROM workspaces w
+         JOIN workspace_members wm ON w.id = wm.workspace_id
+         LEFT JOIN workspace_members wm2 ON w.id = wm2.workspace_id
+         WHERE wm.user_id = $1
+         GROUP BY w.id, wm.role
+         ORDER BY w.created_at DESC`,
+        [userId]
+      );
+      return result.rows;
+    },
+    300
   );
-  return result.rows;
 }
 
 export async function getWorkspaceById(workspaceId, userId) {
-  // Verify user is actually a member before returning data
-  const result = await db.query(
-    `SELECT 
-      w.*,
-      wm.role AS my_role
-     FROM workspaces w
-     JOIN workspace_members wm ON w.id = wm.workspace_id
-     WHERE w.id = $1 AND wm.user_id = $2`,
-    [workspaceId, userId]
+  return getOrSet(
+    `workspace:${workspaceId}:user:${userId}`,
+    async () => {
+      const result = await db.query(
+        `SELECT w.*, wm.role AS my_role
+         FROM workspaces w
+         JOIN workspace_members wm ON w.id = wm.workspace_id
+         WHERE w.id = $1 AND wm.user_id = $2`,
+        [workspaceId, userId]
+      );
+      if (result.rows.length === 0) {
+        throw new AppError('Workspace not found or access denied', 404);
+      }
+      return result.rows[0];
+    },
+    300
   );
-
-  if (result.rows.length === 0) {
-    throw new AppError('Workspace not found or access denied', 404);
-  }
-
-  return result.rows[0];
 }
 
 export async function inviteMember({ workspaceId, email, role }, requesterId) {
-  // Check requester is owner or admin
   const requester = await db.query(
     `SELECT role FROM workspace_members 
      WHERE workspace_id = $1 AND user_id = $2`,
@@ -85,7 +91,6 @@ export async function inviteMember({ workspaceId, email, role }, requesterId) {
     throw new AppError('Only owners and admins can invite members', 403);
   }
 
-  // Find user by email
   const userResult = await db.query(
     'SELECT id FROM users WHERE email = $1',
     [email]
@@ -97,7 +102,6 @@ export async function inviteMember({ workspaceId, email, role }, requesterId) {
 
   const invitedUser = userResult.rows[0];
 
-  // Check not already a member
   const existing = await db.query(
     `SELECT id FROM workspace_members 
      WHERE workspace_id = $1 AND user_id = $2`,
@@ -114,11 +118,22 @@ export async function inviteMember({ workspaceId, email, role }, requesterId) {
     [workspaceId, invitedUser.id, role || 'member']
   );
 
+  await invalidatePattern(`workspace:${workspaceId}:*`);
+  await invalidatePattern(`workspaces:user:*`);
+
+  await logActivity({
+    action: 'member.invited',
+    entityType: 'workspace',
+    entityId: workspaceId,
+    userId: requesterId,
+    workspaceId,
+    metadata: { invitedEmail: email, role },
+  });
+
   return { message: 'Member invited successfully' };
 }
 
 export async function getWorkspaceMembers(workspaceId, userId) {
-  // Verify requester is a member first
   await getWorkspaceById(workspaceId, userId);
 
   const result = await db.query(
@@ -131,13 +146,6 @@ export async function getWorkspaceMembers(workspaceId, userId) {
      ORDER BY wm.joined_at ASC`,
     [workspaceId]
   );
-await logActivity({
-  action: 'member.invited',
-  entityType: 'workspace',
-  entityId: workspaceId,
-  userId: requesterId,
-  workspaceId,
-  metadata: { invitedEmail: email, role },
-});
+
   return result.rows;
 }

@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0a;
+  --color-background-secondary: #111111;
+  --color-background-tertiary: #1a1a1a;
+  --color-border: #2a2a2a;
+  --color-brand: #7c3aed;
+  --color-brand-light: #8b5cf6;
+  --color-brand-dark: #6d28d9;
+  --color-muted: #737373;
+
+  --animate-fade-in: fadeIn 0.2s ease-in-out;
+  --animate-slide-in-right: slideInRight 0.3s ease-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-white antialiased selection:bg-brand/30 selection:text-white;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-background-secondary border border-border rounded-xl shadow-lg;
+  }
+
+  /* Define base button styles without composing with other custom classes to avoid v4 issues */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none bg-brand hover:bg-brand-light text-white;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none bg-background-tertiary hover:bg-background-secondary border border-border text-white;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-muted hover:text-white hover:bg-background-tertiary transition-colors;
+  }
+
+  .sidebar-link.active {
+    @apply text-white bg-background-tertiary font-medium;
+  }
+
+  .form-input {
+    @apply w-full bg-background-tertiary border border-border rounded-lg px-4 py-2 placeholder:text-muted focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-all;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted;
+}

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '../../db/index.js';
 import { config } from '../../config/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { emailQueue } from '../../config/queue.js';
 
 export async function registerUser({ name, email, password }) {
   // Check if email already exists
@@ -25,6 +26,11 @@ export async function registerUser({ name, email, password }) {
      RETURNING id, name, email, created_at`,
     [name, email, hashedPassword]
   );
+
+  await emailQueue.add('welcome', {
+    type: 'welcome',
+    data: { name, email },
+  });
 
   return result.rows[0];
 }

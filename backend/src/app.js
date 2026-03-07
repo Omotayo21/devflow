@@ -10,11 +10,12 @@ import workspaceRoutes from './modules/workspaces/workspaces.routes.js';
 import projectRoutes from './modules/projects/projects.routes.js';
 import taskRoutes from './modules/tasks/tasks.routes.js';
 import activitiesRoutes from './modules/activities/activities.routes.js';
+import searchRoutes from './modules/search/search.routes.js';
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(globalLimiter);
@@ -41,6 +42,7 @@ app.use('/api/v1/workspaces', workspaceRoutes);
 app.use('/api/v1/workspaces/:workspaceId/projects', projectRoutes);
 app.use('/api/v1/projects/:projectId/tasks', taskRoutes);
 app.use('/api/v1/workspaces/:workspaceId/activities', activitiesRoutes);
+app.use('/api/v1/workspaces/:workspaceId/search', searchRoutes);
 
 app.use(errorHandler);
 

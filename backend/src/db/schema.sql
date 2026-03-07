@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS projects (
   created_by UUID NOT NULL REFERENCES users(id),
   status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  search_vector tsvector
 );
 
 -- TASKS
@@ -64,7 +65,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_by UUID NOT NULL REFERENCES users(id),
   due_date TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  search_vector tsvector
 );
 
 -- COMMENTS
@@ -97,3 +99,64 @@ CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_activities_workspace_id ON activities(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON workspace_members(user_id);
+
+-- FULL TEXT SEARCH COLUMNS (ensure they exist if table already existed)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS search_vector tsvector;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS search_vector tsvector;
+
+-- Search Indexes
+CREATE INDEX IF NOT EXISTS idx_tasks_search ON tasks USING gin(search_vector);
+CREATE INDEX IF NOT EXISTS idx_projects_search ON projects USING gin(search_vector);
+
+-- AUTOMATIC UPDATED_AT TRIGGER
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_users_updated_at ON users;
+CREATE TRIGGER trigger_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_workspaces_updated_at ON workspaces;
+CREATE TRIGGER trigger_workspaces_updated_at BEFORE UPDATE ON workspaces FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_projects_updated_at ON projects;
+CREATE TRIGGER trigger_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_tasks_updated_at ON tasks;
+CREATE TRIGGER trigger_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_comments_updated_at ON comments;
+CREATE TRIGGER trigger_comments_updated_at BEFORE UPDATE ON comments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- FULL TEXT SEARCH TRIGGERS
+CREATE OR REPLACE FUNCTION update_task_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector = to_tsvector('english', 
+    coalesce(NEW.title, '') || ' ' || coalesce(NEW.description, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_tasks_search_vector ON tasks;
+CREATE TRIGGER trigger_tasks_search_vector
+  BEFORE INSERT OR UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION update_task_search_vector();
+
+CREATE OR REPLACE FUNCTION update_project_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector = to_tsvector('english',
+    coalesce(NEW.name, '') || ' ' || coalesce(NEW.description, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_projects_search_vector ON projects;
+CREATE TRIGGER trigger_projects_search_vector
+  BEFORE INSERT OR UPDATE ON projects
+  FOR EACH ROW EXECUTE FUNCTION update_project_search_vector();
