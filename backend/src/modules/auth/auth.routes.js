@@ -52,47 +52,49 @@ router.post('/forgot-password', validate(forgotPasswordSchema), authController.f
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 
 // Google OAuth
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+if (config.google.clientId && config.google.clientSecret) {
+  router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
 
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: `${config.frontendUrl}/login?error=oauth_failed`, session: false }), async (req, res) => {
-  try {
-    const user = req.user;
-    
-    // Generate access token
-    const accessToken = jwt.sign(
-      { userId: user.id, email: user.email },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
-    );
+  router.get('/google/callback', passport.authenticate('google', { failureRedirect: `${config.frontendUrl}/login?error=oauth_failed`, session: false }), async (req, res) => {
+    try {
+      const user = req.user;
+      
+      // Generate access token
+      const accessToken = jwt.sign(
+        { userId: user.id, email: user.email },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
 
-    // Generate refresh token
-    const refreshToken = jwt.sign(
-      { userId: user.id },
-      config.jwt.refreshSecret,
-      { expiresIn: config.jwt.refreshExpiresIn }
-    );
+      // Generate refresh token
+      const refreshToken = jwt.sign(
+        { userId: user.id },
+        config.jwt.refreshSecret,
+        { expiresIn: config.jwt.refreshExpiresIn }
+      );
 
-    // Save refresh token to DB
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await db.query(
-      `INSERT INTO refresh_tokens (user_id, token, expires_at)
-       VALUES ($1, $2, $3)`,
-      [user.id, refreshToken, expiresAt]
-    );
+      // Save refresh token to DB
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await db.query(
+        `INSERT INTO refresh_tokens (user_id, token, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.id, refreshToken, expiresAt]
+      );
 
-    // Set refresh token as httpOnly cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+      // Set refresh token as httpOnly cookie
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
 
-    // Redirect to frontend
-    res.redirect(`${config.frontendUrl}/auth/callback?token=${accessToken}`);
-  } catch (err) {
-    res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
-  }
-});
+      // Redirect to frontend
+      res.redirect(`${config.frontendUrl}/auth/callback?token=${accessToken}`);
+    } catch (err) {
+      res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
+    }
+  });
+}
 
 export default router;
