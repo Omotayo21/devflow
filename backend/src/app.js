@@ -11,22 +11,20 @@ import projectRoutes from './modules/projects/projects.routes.js';
 import taskRoutes from './modules/tasks/tasks.routes.js';
 import activitiesRoutes from './modules/activities/activities.routes.js';
 import searchRoutes from './modules/search/search.routes.js';
+import usersRoutes from './modules/users/users.routes.js';
+import passport from './config/passport.js';
 
 const app = express();
-app.set('trust proxy', 1)
-app.use(helmet());
-/*app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.FRONTEND_URL || true  // true accepts any origin in prod
-    : 'http://localhost:5173',
-  credentials: true,
-})); */
 app.use(cors({
-  origin: '*',
-  credentials: false,
+  origin: (origin, callback) => {
+    // Allow any origin
+    callback(null, true);
+  },
+  credentials: true,
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(passport.initialize());
 app.use(globalLimiter);
 
 // Request logger
@@ -52,6 +50,7 @@ app.use('/api/v1/workspaces/:workspaceId/projects', projectRoutes);
 app.use('/api/v1/projects/:projectId/tasks', taskRoutes);
 app.use('/api/v1/workspaces/:workspaceId/activities', activitiesRoutes);
 app.use('/api/v1/workspaces/:workspaceId/search', searchRoutes);
+app.use('/api/v1/users', usersRoutes);
 
 app.use(errorHandler);
 

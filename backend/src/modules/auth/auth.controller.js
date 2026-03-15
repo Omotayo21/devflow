@@ -57,3 +57,29 @@ export async function logout(req, res, next) {
     next(err);
   }
 }
+
+export async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+    const result = await authService.forgotPassword(email);
+    res.json({ 
+      status: 'success', 
+      message: result.message 
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req, res, next) {
+  try {
+    const { token, newPassword } = req.body;
+    const result = await authService.resetPassword(token, newPassword);
+    res.json({ 
+      status: 'success', 
+      message: result.message 
+    });
+  } catch (err) {
+    next(err);
+  }
+}

@@ -1,6 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import { logger } from '../utils/logger.js';
-import { sendTaskAssignedEmail, sendWelcomeEmail } from '../utils/email.js';
+import { sendTaskAssignedEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email.js';
 
 const connection = {
   url: process.env.REDIS_URL,
@@ -22,6 +22,10 @@ export const emailWorker = new Worker(
 
     if (type === 'welcome') {
       await sendWelcomeEmail(data);
+    }
+
+    if (type === 'password.reset') {
+      await sendPasswordResetEmail(data);
     }
   },
   { 

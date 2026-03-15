@@ -1,33 +1,39 @@
-import axios from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/useAuthStore';
+import { ApiResponse } from '../types';
 
-const api = axios.create({
-  baseURL: 'http://localhost:5000/api/v1',
-  withCredentials: true, // required for httpOnly refresh cookies
+interface FailedRequest {
+  resolve: (token: string) => void;
+  reject: (error: any) => void;
+}
+
+const api: AxiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  withCredentials: true,
 });
 
 // Request interceptor for attaching the JWT
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error: AxiosError) => Promise.reject(error)
 );
 
 // Response interceptor for handling silent refresh
 let isRefreshing = false;
-let failedQueue = [];
+let failedQueue: FailedRequest[] = [];
 
-const processQueue = (error, token = null) => {
+const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve(token!);
     }
   });
   failedQueue = [];
@@ -35,13 +41,13 @@ const processQueue = (error, token = null) => {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     // If 401 and not already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
@@ -55,14 +61,14 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(
-          'http://localhost:5000/api/v1/auth/refresh',
+        const { data } = await axios.post<ApiResponse<{ accessToken: string }>>(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'}/auth/refresh`,
           {},
           { withCredentials: true }
         );
 
         const { accessToken } = data.data;
-        useAuthStore.getState().setAuth(useAuthStore.getState().user, accessToken);
+        useAuthStore.getState().setAccessToken(accessToken);
 
         processQueue(null, accessToken);
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -70,7 +76,6 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         useAuthStore.getState().logout();
-        // window.location.href = '/login'; 
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -11,6 +11,8 @@ import Workspaces from './pages/workspaces/Workspaces';
 import WorkspaceDetail from './pages/workspaces/WorkspaceDetail';
 import ProjectBoard from './pages/projects/ProjectBoard';
 import Profile from './pages/profile/Profile';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Components
 import Layout from './components/Layout';
@@ -25,12 +27,12 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuth = useAuthStore((state) => state.isAuthenticated);
   return isAuth ? children : <Navigate to="/login" replace />;
 }
 
-function PublicRoute({ children }) {
+function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuth = useAuthStore((state) => state.isAuthenticated);
   return isAuth ? <Navigate to="/" replace /> : children;
 }
@@ -43,6 +45,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+          <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
