@@ -1,4 +1,6 @@
 import * as authService from './auth.service.js';
+import { db } from '../../db/index.js';
+import { AppError } from '../../middleware/errorHandler.js';
 
 const cookieOptions = {
   httpOnly: true,      // JS cannot access this cookie
@@ -78,6 +80,28 @@ export async function resetPassword(req, res, next) {
     res.json({ 
       status: 'success', 
       message: result.message 
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMe(req, res, next) {
+  try {
+    const { userId } = req.user;
+    const result = await db.query(
+      'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = result.rows[0];
+    
+    if (!user) {
+      return next(new AppError('User not found', 404));
+    }
+
+    res.json({
+      status: 'success',
+      data: { user },
     });
   } catch (err) {
     next(err);

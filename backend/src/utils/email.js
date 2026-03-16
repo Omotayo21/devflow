@@ -1,21 +1,7 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { logger } from './logger.js';
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Use STARTTLS
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 60000,
-  family: 4, // FORCE IPv4 to fix ENETUNREACH on Railway
-  debug: true,
-  logger: true
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const commonStyles = `
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -39,6 +25,9 @@ const buttonStyle = `
   margin-top: 24px;
 `;
 
+// Use a verified domain or the default Resend one for testing
+const FROM_EMAIL = 'DevFlow <onboarding@resend.dev>';
+
 export async function sendTaskAssignedEmail({ 
   assigneeName, 
   assigneeEmail, 
@@ -49,8 +38,8 @@ export async function sendTaskAssignedEmail({
   projectId
 }) {
   try {
-    await transporter.sendMail({
-      from: `"DevFlow" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: FROM_EMAIL,
       to: assigneeEmail,
       subject: `New task assigned: ${taskTitle}`,
       html: `
@@ -76,17 +65,17 @@ export async function sendTaskAssignedEmail({
         </div>
       `,
     });
-    logger.info({ assigneeEmail, taskTitle }, 'Task assignment email sent');
+    logger.info({ assigneeEmail, taskTitle }, 'Task assignment email sent via Resend');
   } catch (err) {
-    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send task assignment email');
+    logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
     throw err;
   }
 }
 
 export async function sendWelcomeEmail({ name, email }) {
   try {
-    await transporter.sendMail({
-      from: `"DevFlow" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: FROM_EMAIL,
       to: email,
       subject: 'Welcome to DevFlow 🎉',
       html: `
@@ -115,15 +104,15 @@ export async function sendWelcomeEmail({ name, email }) {
       `,
     });
   } catch (err) {
-    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send welcome email');
+    logger.error({ err: err.message, stack: err.stack }, 'Failed to send welcome email');
     throw err;
   }
 }
 
 export async function sendPasswordResetEmail({ name, email, resetToken }) {
   try {
-    await transporter.sendMail({
-      from: `"DevFlow" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: FROM_EMAIL,
       to: email,
       subject: 'Reset your password',
       html: `
@@ -153,7 +142,7 @@ export async function sendPasswordResetEmail({ name, email, resetToken }) {
       `,
     });
   } catch (err) {
-    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send password reset email');
+    logger.error({ err: err.message, stack: err.stack }, 'Failed to send password reset email');
     throw err;
   }
 }
@@ -165,8 +154,8 @@ export async function sendWorkspaceInviteEmail({
   role 
 }) {
   try {
-    await transporter.sendMail({
-      from: `"DevFlow" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: FROM_EMAIL,
       to: inviteeEmail,
       subject: `You've been invited to ${workspaceName} on DevFlow`,
       html: `
@@ -179,7 +168,7 @@ export async function sendWorkspaceInviteEmail({
               <strong>${invitedByName}</strong> has invited you to join the <strong>${workspaceName}</strong> workspace as an <strong>${role}</strong>.
             </p>
             <div style="border: 2px solid #7c3aed20; background-color: #7c3aed05; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-              <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and startシステムの collaborating!</p>
+              <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and start collaborating!</p>
             </div>
             <a href="${process.env.FRONTEND_URL}/login" style="${buttonStyle}">
               Accept Invitation & Login
@@ -192,9 +181,10 @@ export async function sendWorkspaceInviteEmail({
         </div>
       `,
     });
-    logger.info({ inviteeEmail, workspaceName }, 'Workspace invitation email sent');
+    logger.info({ inviteeEmail, workspaceName }, 'Workspace invitation email sent via Resend');
   } catch (err) {
-    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send workspace invitation email');
+    logger.error({ err: err.message, stack: err.stack }, 'Failed to send workspace invitation email');
     throw err;
   }
 }
+
