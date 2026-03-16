@@ -2,15 +2,18 @@ import nodemailer from 'nodemailer';
 import { logger } from './logger.js';
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // Use STARTTLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 20000, // Increased for cloud stability
+  connectionTimeout: 20000,
   greetingTimeout: 20000,
   socketTimeout: 60000,
-  debug: true, // Keep debug logging to monitor Railway logs
+  family: 4, // FORCE IPv4 to fix ENETUNREACH on Railway
+  debug: true,
   logger: true
 });
 
@@ -176,7 +179,7 @@ export async function sendWorkspaceInviteEmail({
               <strong>${invitedByName}</strong> has invited you to join the <strong>${workspaceName}</strong> workspace as an <strong>${role}</strong>.
             </p>
             <div style="border: 2px solid #7c3aed20; background-color: #7c3aed05; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-              <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and start collaborating!</p>
+              <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and startシステムの collaborating!</p>
             </div>
             <a href="${process.env.FRONTEND_URL}/login" style="${buttonStyle}">
               Accept Invitation & Login
@@ -195,4 +198,3 @@ export async function sendWorkspaceInviteEmail({
     throw err;
   }
 }
-
