@@ -15,6 +15,7 @@ import usersRoutes from './modules/users/users.routes.js';
 import passport from './config/passport.js';
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors({
   origin: (origin, callback) => {
     // Allow any origin

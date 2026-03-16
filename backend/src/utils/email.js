@@ -4,10 +4,16 @@ import { logger } from './logger.js';
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT),
+  secure: parseInt(process.env.EMAIL_PORT) === 465, // Use SSL for 465, STARTTLS for 587
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 30000,
+  debug: true, // Enable debug logging in transporter
+  logger: true // Log transporter activity
 });
 
 const commonStyles = `
@@ -71,8 +77,8 @@ export async function sendTaskAssignedEmail({
     });
     logger.info({ assigneeEmail, taskTitle }, 'Task assignment email sent');
   } catch (err) {
-  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
- throw err;
+    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send task assignment email');
+    throw err;
   }
 }
 
@@ -108,8 +114,8 @@ export async function sendWelcomeEmail({ name, email }) {
       `,
     });
   } catch (err) {
-  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
- throw err;
+    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send welcome email');
+    throw err;
   }
 }
 
@@ -146,8 +152,8 @@ export async function sendPasswordResetEmail({ name, email, resetToken }) {
       `,
     });
   } catch (err) {
-  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
- throw err;
+    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send password reset email');
+    throw err;
   }
 }
 
@@ -187,7 +193,8 @@ export async function sendWorkspaceInviteEmail({
     });
     logger.info({ inviteeEmail, workspaceName }, 'Workspace invitation email sent');
   } catch (err) {
-   logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
- throw err;
+    logger.error({ err: err.message, stack: err.stack, code: err.code }, 'Failed to send workspace invitation email');
+    throw err;
   }
 }
+破

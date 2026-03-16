@@ -15,7 +15,8 @@ import {
   AlertCircle,
   Pencil,
   TrendingUp,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { Activity } from '../../types';
 import { updateComment } from '../../api/tasks';
@@ -307,6 +308,9 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       toast.success('Task updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update task');
     }
   });
 
@@ -342,6 +346,8 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
     }
   });
 
+  const isUpdating = updateTaskMutation.isPending;
+
   return (
     <div className="fixed inset-0 z-[60] flex justify-end">
       <div 
@@ -349,6 +355,17 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
         onClick={onClose} 
       />
       <div className="relative w-full max-w-xl bg-zinc-950 border-l border-zinc-900 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        
+        {/* Loading Overlay */}
+        {isUpdating && (
+          <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-[2px] z-[70] flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
+            <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl">
+              <Loader2 className="text-violet-500 animate-spin" size={24} />
+            </div>
+            <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest animate-pulse">Updating Task...</p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/50 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
@@ -668,4 +685,4 @@ function AddTaskSlideOver({ projectId, initialStatus = 'todo', onClose }: { proj
     </div>
   );
 }
-
+破
