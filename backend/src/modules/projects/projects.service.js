@@ -81,3 +81,29 @@ export async function updateProject({ name, description, status }, projectId, us
 
   return result.rows[0];
 }
+
+export async function deleteProject(projectId, userId) {
+  const project = await getProjectById(projectId, userId);
+  
+  // Verify access (owner or admin of workspace)
+  const member = await db.query(
+    'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+    [project.workspace_id, userId]
+  );
+  
+  if (member.rows.length === 0) {
+    throw new AppError('Forbidden', 403);
+  }
+  
+  const isOwnerOrAdmin = ['owner', 'admin'].includes(member.rows[0].role);
+  const isCreator = project.created_by === userId;
+
+  if (!isOwnerOrAdmin && !isCreator) {
+    throw new AppError('Only the project creator or workspace admins can delete this project', 403);
+  }
+
+  await db.query('DELETE FROM projects WHERE id = $1', [projectId]);
+  await invalidate(`projects:workspace:${project.workspace_id}`);
+  
+  return { message: 'Project deleted successfully' };
+}

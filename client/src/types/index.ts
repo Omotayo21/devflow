@@ -43,6 +43,8 @@ export interface Task {
   assignee_avatar: string | null;
   created_by: string;
   due_date: string | null;
+  dueDate?: string; // For backend updates
+  assigneeId?: string; // For backend updates
   comment_count?: number;
   created_at: string;
   updated_at: string;

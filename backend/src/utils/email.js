@@ -38,9 +38,8 @@ export async function sendTaskAssignedEmail({
   taskTitle, 
   projectName, 
   assignedByName,
-  taskId,
-  projectId,
-  workspaceId
+  workspaceId,
+  projectId
 }) {
   try {
     await transporter.sendMail({
@@ -72,8 +71,8 @@ export async function sendTaskAssignedEmail({
     });
     logger.info({ assigneeEmail, taskTitle }, 'Task assignment email sent');
   } catch (err) {
-    logger.error({ err }, 'Failed to send task assignment email');
-    throw err;
+  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
+ throw err;
   }
 }
 
@@ -109,8 +108,8 @@ export async function sendWelcomeEmail({ name, email }) {
       `,
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to send welcome email');
-    throw err;
+  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
+ throw err;
   }
 }
 
@@ -147,7 +146,48 @@ export async function sendPasswordResetEmail({ name, email, resetToken }) {
       `,
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to send password reset email');
-    throw err;
+  logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
+ throw err;
+  }
+}
+
+export async function sendWorkspaceInviteEmail({ 
+  inviteeEmail, 
+  workspaceName, 
+  invitedByName,
+  role 
+}) {
+  try {
+    await transporter.sendMail({
+      from: `"DevFlow" <${process.env.EMAIL_USER}>`,
+      to: inviteeEmail,
+      subject: `You've been invited to ${workspaceName} on DevFlow`,
+      html: `
+        <div style="background-color: #f4f4f5; padding: 40px 0;">
+          <div style="${commonStyles}">
+            <h1 style="color: #7c3aed; margin-bottom: 24px; font-size: 24px;">DevFlow</h1>
+            <h2 style="font-size: 20px; margin-bottom: 16px;">Workspace Invitation</h2>
+            <p style="font-size: 16px; color: #52525b; margin-bottom: 16px;">Hi there,</p>
+            <p style="font-size: 16px; color: #52525b; margin-bottom: 24px;">
+              <strong>${invitedByName}</strong> has invited you to join the <strong>${workspaceName}</strong> workspace as an <strong>${role}</strong>.
+            </p>
+            <div style="border: 2px solid #7c3aed20; background-color: #7c3aed05; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+              <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and start collaborating!</p>
+            </div>
+            <a href="${process.env.FRONTEND_URL}/login" style="${buttonStyle}">
+              Accept Invitation & Login
+            </a>
+            <hr style="margin-top: 40px; border: none; border-top: 1px solid #e4e4e7;" />
+            <p style="font-size: 12px; color: #a1a1aa; margin-top: 20px; text-align: center;">
+              You're receiving this because you've been invited to a DevFlow workspace.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    logger.info({ inviteeEmail, workspaceName }, 'Workspace invitation email sent');
+  } catch (err) {
+   logger.error({ err: err.message, stack: err.stack }, 'Failed to send task assignment email');
+ throw err;
   }
 }

@@ -17,7 +17,7 @@ const loginSchema = z.object({
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const { register, handleSubmit, formState: { errors } } = useForm({
@@ -29,7 +29,7 @@ export default function Login() {
     try {
       const response = await axios.post('/auth/login', data);
       const { user, accessToken } = response.data.data;
-      setAuth(user, accessToken);
+      login(user, accessToken);
       toast.success('Welcome back!');
       navigate('/');
     } catch (error) {

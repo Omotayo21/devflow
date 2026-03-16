@@ -31,7 +31,13 @@ export const addComment = async (projectId: string, taskId: string, data: Partia
   return response.data;
 };
 
+export const updateComment = async (projectId: string, taskId: string, commentId: string, data: { content: string }): Promise<ApiResponse<{ comment: Comment }>> => {
+  const response = await api.patch(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, data);
+  return response.data;
+};
+
 export const deleteComment = async (projectId: string, taskId: string, commentId: string): Promise<ApiResponse<void>> => {
+
   const response = await api.delete(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`);
   return response.data;
 };

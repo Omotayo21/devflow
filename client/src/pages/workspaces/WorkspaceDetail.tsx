@@ -6,14 +6,14 @@ import {
   Users, 
   Activity as ActivityIcon, 
   Plus, 
-  Settings,
   Mail,
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  Trash2
 } from 'lucide-react';
-import { Project, Activity } from '../../types';
+import { Activity } from '../../types';
 import { getWorkspaceById, getWorkspaceMembers, inviteMember } from '../../api/workspaces';
-import { getProjects, createProject } from '../../api/projects';
+import { getProjects, createProject, deleteProject } from '../../api/projects';
 import { getWorkspaceActivity } from '../../api/activities';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
@@ -37,7 +37,7 @@ export default function WorkspaceDetail() {
     enabled: !!workspaceId,
   });
 
-  const workspace = workspaceResponse?.data;
+  const workspace = (workspaceResponse as any)?.data?.workspace;
 
   if (wsLoading) {
     return (
@@ -91,10 +91,6 @@ export default function WorkspaceDetail() {
             {workspace.description || 'No description provided for this workspace.'}
           </p>
         </div>
-        <Button variant="outline" className="flex items-center gap-2 border-zinc-800 hover:bg-zinc-900">
-          <Settings size={18} />
-          Settings
-        </Button>
       </div>
 
       {/* Tabs Navigation */}
@@ -138,6 +134,17 @@ function ProjectsTab({ workspaceId }: { workspaceId: string }) {
 
   const projects = projectsResponse?.data?.projects || [];
 
+  const deleteMutation = useMutation({
+    mutationFn: (projectId: string) => deleteProject(workspaceId, projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', workspaceId] });
+      toast.success('Project deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete project');
+    }
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -166,15 +173,28 @@ function ProjectsTab({ workspaceId }: { workspaceId: string }) {
             <div 
               key={project.id} 
               onClick={() => navigate(`/workspaces/${workspaceId}/projects/${project.id}`)}
-              className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl group cursor-pointer hover:border-violet-500/40 transition-all duration-300 shadow-sm"
+              className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl group cursor-pointer hover:border-violet-500/40 transition-all duration-300 shadow-sm relative overflow-hidden"
             >
               <div className="flex items-center justify-between mb-4">
                 <Badge variant={project.status === 'active' ? 'purple' : 'default'} className="text-[10px] uppercase">
                   {project.status}
                 </Badge>
-                <span className="text-[11px] text-zinc-600 font-medium">
-                  {new Date(project.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-zinc-600 font-medium">
+                    {new Date(project.created_at).toLocaleDateString()}
+                  </span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('Are you sure you want to delete this project? This will delete all tasks within it.')) {
+                        deleteMutation.mutate(project.id);
+                      }
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               <h4 className="font-bold text-lg text-zinc-100 mb-2 group-hover:text-violet-400 transition-colors">
                 {project.name}
@@ -324,20 +344,34 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
     );
   }
 
+  const formatActivityAction = (action: string) => {
+    switch (action) {
+      case 'task.created': return 'created task';
+      case 'task.updated': return 'updated task';
+      case 'task.deleted': return 'deleted task';
+      case 'comment.added': return 'added a comment to';
+      case 'comment.updated': return 'updated a comment on';
+      case 'comment.deleted': return 'deleted a comment from';
+      case 'member.invited': return 'invited';
+      case 'project.created': return 'created project';
+      default: return action.replace('.', ' ');
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto">
       <div className="relative border-l border-zinc-900 ml-5 pl-10 space-y-10 py-4">
         {activities.map((activity: Activity) => (
           <div key={activity.id} className="relative">
             <div className="absolute -left-[58px] top-1">
-              <Avatar name={activity.user_name} size="sm" />
+              <Avatar name={activity.user_name} src={activity.user_avatar} size="sm" />
             </div>
             <div className="bg-zinc-950/40 border border-zinc-900 p-4 rounded-2xl hover:bg-zinc-950/80 transition-all duration-300">
               <p className="text-sm text-zinc-300 leading-relaxed">
                 <span className="font-bold text-zinc-100">{activity.user_name}</span>{' '}
-                {activity.action.replace('_', ' ')}{' '}
+                {formatActivityAction(activity.action)}{' '}
                 <span className="text-violet-400 font-semibold hover:underline cursor-pointer">
-                  {activity.metadata?.taskTitle || activity.metadata?.entityName || 'item'}
+                  {activity.metadata?.taskTitle || activity.metadata?.entityName || activity.metadata?.projectName || 'item'}
                 </span>
               </p>
               <p className="text-[11px] text-zinc-600 mt-2 font-medium tracking-tight">

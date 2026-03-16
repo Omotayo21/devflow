@@ -56,3 +56,15 @@ export async function getMembers(req, res, next) {
     next(err);
   }
 }
+
+export async function deleteWorkspace(req, res, next) {
+  try {
+    const result = await workspacesService.deleteWorkspace(
+      req.params.workspaceId,
+      req.user.userId
+    );
+    res.json({ status: 'success', data: result });
+  } catch (err) {
+    next(err);
+  }
+}

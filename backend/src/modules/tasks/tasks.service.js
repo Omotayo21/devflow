@@ -87,7 +87,8 @@ export async function getProjectTasks(projectId, userId, query) {
         t.*,
         u.name AS assignee_name,
         u.avatar_url AS assignee_avatar,
-        c.name AS created_by_name
+        c.name AS created_by_name,
+        (SELECT COUNT(*)::INTEGER FROM comments WHERE task_id = t.id) AS comment_count
        FROM tasks t
        LEFT JOIN users u ON t.assignee_id = u.id
        JOIN users c ON t.created_by = c.id
@@ -207,6 +208,10 @@ export async function deleteTask(taskId, userId) {
     throw new AppError('Task not found or access denied', 404);
   }
 
+  if (task.rows[0].created_by !== userId) {
+    throw new AppError('Only the task creator can delete this task', 403);
+  }
+
   await db.query('DELETE FROM tasks WHERE id = $1', [taskId]);
   await invalidate(`projects:workspace:${task.rows[0].workspace_id}`);
   return { message: 'Task deleted successfully' };
@@ -290,4 +295,22 @@ export async function deleteComment(commentId, userId) {
 
   await db.query('DELETE FROM comments WHERE id = $1', [commentId]);
   return { message: 'Comment deleted' };
+}
+
+export async function updateComment(commentId, content, userId) {
+  const comment = await db.query(
+    'SELECT * FROM comments WHERE id = $1 AND user_id = $2',
+    [commentId, userId]
+  );
+
+  if (comment.rows.length === 0) {
+    throw new AppError('Comment not found or not yours to update', 404);
+  }
+
+  const result = await db.query(
+    `UPDATE comments SET content = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [content, commentId]
+  );
+  
+  return result.rows[0];
 }

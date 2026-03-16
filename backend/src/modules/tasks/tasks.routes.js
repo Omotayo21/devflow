@@ -35,6 +35,7 @@ router.patch('/:taskId', validate(updateTaskSchema), tasksController.updateTask)
 router.delete('/:taskId', tasksController.deleteTask);
 router.post('/:taskId/comments', tasksController.createComment);
 router.get('/:taskId/comments', tasksController.getTaskComments);
+router.patch('/:taskId/comments/:commentId', tasksController.updateComment);
 router.delete('/:taskId/comments/:commentId', tasksController.deleteComment);
 
 export default router;

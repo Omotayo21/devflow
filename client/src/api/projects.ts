@@ -20,3 +20,9 @@ export const updateProject = async (workspaceId: string, projectId: string, data
   const response = await api.patch(`/workspaces/${workspaceId}/projects/${projectId}`, data);
   return response.data;
 };
+
+export const deleteProject = async (workspaceId: string, projectId: string): Promise<ApiResponse<void>> => {
+  const response = await api.delete(`/workspaces/${workspaceId}/projects/${projectId}`);
+  return response.data;
+};
+

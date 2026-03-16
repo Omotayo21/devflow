@@ -1,6 +1,7 @@
 import { db } from '../../db/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { logActivity } from '../../utils/activity.js';
+import { emailQueue } from '../../config/queue.js';
 import { getOrSet, invalidate, invalidatePattern } from '../../utils/cache.js';
 
 export async function createWorkspace({ name, description }, userId) {
@@ -130,6 +131,20 @@ export async function inviteMember({ workspaceId, email, role }, requesterId) {
     metadata: { invitedEmail: email, role },
   });
 
+  // Send invitation email
+  const workspaceData = await db.query('SELECT name FROM workspaces WHERE id = $1', [workspaceId]);
+  const invitedByData = await db.query('SELECT name FROM users WHERE id = $1', [requesterId]);
+
+  await emailQueue.add('workspace.invited', {
+    type: 'workspace.invited',
+    data: {
+      inviteeEmail: email,
+      workspaceName: workspaceData.rows[0].name,
+      invitedByName: invitedByData.rows[0].name,
+      role: role || 'member'
+    },
+  });
+
   return { message: 'Member invited successfully' };
 }
 
@@ -148,4 +163,18 @@ export async function getWorkspaceMembers(workspaceId, userId) {
   );
 
   return result.rows;
+}
+
+export async function deleteWorkspace(workspaceId, userId) {
+  const workspace = await getWorkspaceById(workspaceId, userId);
+
+  if (workspace.my_role !== 'owner') {
+    throw new AppError('Only the workspace owner can delete the workspace', 403);
+  }
+
+  await db.query('DELETE FROM workspaces WHERE id = $1', [workspaceId]);
+  await invalidatePattern(`workspace:${workspaceId}:*`);
+  await invalidate(`workspaces:user:${userId}`);
+
+  return { message: 'Workspace deleted successfully' };
 }

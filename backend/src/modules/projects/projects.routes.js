@@ -31,5 +31,6 @@ router.post('/', validate(createProjectSchema), projectsController.createProject
 router.get('/', projectsController.getWorkspaceProjects);
 router.get('/:projectId', projectsController.getProject);
 router.patch('/:projectId', validate(updateProjectSchema), projectsController.updateProject);
+router.delete('/:projectId', projectsController.deleteProject);
 
 export default router;

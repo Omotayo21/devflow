@@ -34,5 +34,6 @@ router.get('/', workspacesController.getMyWorkspaces);
 router.get('/:workspaceId', workspacesController.getWorkspace);
 router.post('/:workspaceId/invite', validate(inviteSchema), workspacesController.inviteMember);
 router.get('/:workspaceId/members', workspacesController.getMembers);
+router.delete('/:workspaceId', workspacesController.deleteWorkspace);
 
 export default router;

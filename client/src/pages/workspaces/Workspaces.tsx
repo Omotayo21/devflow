@@ -22,7 +22,7 @@ export default function Workspaces() {
     queryFn: getWorkspaces,
   });
 
-  const workspaces = workspacesResponse?.data || [];
+  const workspaces = (workspacesResponse as any)?.data?.workspaces || [];
 
   return (
     <div className="space-y-8">

@@ -1,6 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import { logger } from '../utils/logger.js';
-import { sendTaskAssignedEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email.js';
+import { sendTaskAssignedEmail, sendWelcomeEmail, sendPasswordResetEmail, sendWorkspaceInviteEmail } from '../utils/email.js';
 
 const connection = {
   url: process.env.REDIS_URL,
@@ -27,6 +27,10 @@ export const emailWorker = new Worker(
     if (type === 'password.reset') {
       await sendPasswordResetEmail(data);
     }
+
+    if (type === 'workspace.invited') {
+      await sendWorkspaceInviteEmail(data);
+    }
   },
   { 
     connection,
@@ -44,3 +48,4 @@ emailWorker.on('completed', (job) => {
 emailWorker.on('failed', (job, err) => {
   logger.error({ jobId: job.id, err }, 'Email job failed');
 });
+

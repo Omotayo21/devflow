@@ -34,7 +34,7 @@ export default function Sidebar() {
     queryFn: getWorkspaces
   });
 
-  const workspaces = (workspacesResponse as any)?.data || [];
+  const workspaces = (workspacesResponse as any)?.data?.workspaces || [];
   const activeWorkspace = (workspaces as any[]).find((w: any) => w.id === activeWorkspaceId) || workspaces[0];
 
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function Sidebar() {
   return (
     <aside 
       className={cn(
-        "relative flex flex-col h-screen bg-[#0a0a0a] border-r border-zinc-800 transition-all duration-300 z-30",
-        sidebarCollapsed ? "w-20" : "w-64"
+        "fixed inset-y-0 left-0 lg:relative flex flex-col h-screen bg-[#0a0a0a] border-r border-zinc-800 transition-all duration-300 z-50 shadow-2xl lg:shadow-none",
+        sidebarCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-72 lg:w-64"
       )}
     >
       {/* Workspace Switcher */}

@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, 
   Filter, 
-  MoreHorizontal, 
   Calendar, 
   MessageSquare, 
   X,
@@ -13,11 +12,19 @@ import {
   Trash2,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Pencil,
+  TrendingUp,
+  ChevronDown
 } from 'lucide-react';
+import { Activity } from '../../types';
+import { updateComment } from '../../api/tasks';
+import { deleteProject } from '../../api/projects';
+
+import { cn } from '../../utils/cn';
 import { getProjectById } from '../../api/projects';
-import { getTasks, createTask, updateTask, getComments, addComment, deleteComment } from '../../api/tasks';
-import { getWorkspaceById } from '../../api/workspaces';
+import { getTasks, createTask, updateTask, deleteTask, getComments, addComment, deleteComment } from '../../api/tasks';
+import { getWorkspaceById, getWorkspaceMembers, inviteMember } from '../../api/workspaces';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
 import { PriorityBadge } from '../../components/ui/Badge';
@@ -27,11 +34,19 @@ import { Spinner } from '../../components/ui/Spinner';
 import { formatRelativeDate } from '../../utils/formatters';
 import { Task } from '../../types';
 
+const COLUMNS = [
+  { id: 'todo', label: 'Todo', icon: AlertCircle, color: 'text-zinc-500' },
+  { id: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-blue-400' },
+  { id: 'in_review', label: 'In Review', icon: MessageSquare, color: 'text-amber-400' },
+  { id: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-400' },
+] as const;
+
 export default function ProjectBoard() {
   const { workspaceId, projectId } = useParams<{ workspaceId: string, projectId: string }>();
   const navigate = useNavigate();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [initialAddStatus, setInitialAddStatus] = useState<Task['status']>('todo');
 
   const { data: workspaceResponse } = useQuery({
     queryKey: ['workspace', workspaceId],
@@ -51,16 +66,13 @@ export default function ProjectBoard() {
     enabled: !!projectId,
   });
 
-  const workspace = workspaceResponse?.data;
+  const workspace = (workspaceResponse as any)?.data?.workspace;
   const project = projectResponse?.data?.project;
   const tasks = tasksResponse?.data?.tasks || [];
 
-  const columns = [
-    { id: 'todo', label: 'Todo', icon: AlertCircle, color: 'text-zinc-500' },
-    { id: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-blue-400' },
-    { id: 'in_review', label: 'In Review', icon: MessageSquare, color: 'text-amber-400' },
-    { id: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-400' },
-  ];
+  const getTasksByStatus = (status: Task['status']) => {
+    return tasks.filter(task => task.status === status);
+  };
 
   if (isLoading) {
     return (
@@ -79,7 +91,7 @@ export default function ProjectBoard() {
             <span className="cursor-pointer hover:text-zinc-400" onClick={() => navigate('/workspaces')}>Workspaces</span>
             <ChevronRight size={12} className="text-zinc-800" />
             <span className="cursor-pointer hover:text-zinc-400" onClick={() => navigate(`/workspaces/${workspaceId}`)}>
-              {workspace?.name || 'Workspace'}
+               {workspace?.name || 'Workspace'}
             </span>
             <ChevronRight size={12} className="text-zinc-800" />
             <span className="text-zinc-400">{project?.name || 'Project'}</span>
@@ -90,9 +102,21 @@ export default function ProjectBoard() {
         </div>
         
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="flex items-center gap-2 border-zinc-800 hover:bg-zinc-900">
-            <Filter size={16} />
-            Filter
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2 border-zinc-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all text-zinc-500"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this entire project?')) {
+                deleteProject(workspaceId!, projectId!).then(() => {
+                  toast.success('Project deleted');
+                  navigate(`/workspaces/${workspaceId}`);
+                });
+              }
+            }}
+          >
+            <Trash2 size={16} />
+            Delete Project
           </Button>
           <Button onClick={() => setIsAddOpen(true)} size="sm" className="flex items-center gap-2">
             <Plus size={16} />
@@ -103,12 +127,16 @@ export default function ProjectBoard() {
 
       {/* Kanban Board Container */}
       <div className="flex-1 flex gap-6 overflow-x-auto pb-6 custom-scrollbar">
-        {columns.map((column) => (
+        {COLUMNS.map((column) => (
           <BoardColumn 
             key={column.id} 
             column={column} 
-            tasks={tasks.filter(t => t.status === column.id)}
+            tasks={getTasksByStatus(column.id as any)}
             onTaskClick={(id) => setSelectedTaskId(id)}
+            onAddClick={() => {
+              setInitialAddStatus(column.id as any);
+              setIsAddOpen(true);
+            }}
           />
         ))}
       </div>
@@ -126,7 +154,11 @@ export default function ProjectBoard() {
       {isAddOpen && (
         <AddTaskSlideOver 
           projectId={projectId!}
-          onClose={() => setIsAddOpen(false)}
+          initialStatus={initialAddStatus}
+          onClose={() => {
+            setIsAddOpen(false);
+            setInitialAddStatus('todo');
+          }}
         />
       )}
     </div>
@@ -139,9 +171,10 @@ interface BoardColumnProps {
   column: { id: string; label: string; icon: any; color: string };
   tasks: Task[];
   onTaskClick: (id: string) => void;
+  onAddClick: () => void;
 }
 
-function BoardColumn({ column, tasks, onTaskClick }: BoardColumnProps) {
+function BoardColumn({ column, tasks, onTaskClick, onAddClick }: BoardColumnProps) {
   return (
     <div className="w-80 shrink-0 flex flex-col gap-4">
       <div className="flex items-center justify-between px-1">
@@ -152,7 +185,10 @@ function BoardColumn({ column, tasks, onTaskClick }: BoardColumnProps) {
             {tasks.length}
           </span>
         </div>
-        <button className="text-zinc-600 hover:text-zinc-100 transition-colors p-1 hover:bg-zinc-900 rounded-md">
+        <button 
+          onClick={onAddClick}
+          className="text-zinc-600 hover:text-zinc-100 transition-colors p-1 hover:bg-zinc-900 rounded-md"
+        >
           <Plus size={16} />
         </button>
       </div>
@@ -180,16 +216,22 @@ function TaskCard({ task, onClick }: TaskCardProps) {
   return (
     <div 
       onClick={onClick}
-      className="bg-zinc-950 border border-zinc-900 p-4 rounded-xl hover:border-violet-500/40 group cursor-pointer transition-all duration-300 shadow-sm hover:shadow-violet-500/5 hover:-translate-y-0.5"
+      className={cn(
+        "bg-zinc-950 border border-zinc-900 p-4 rounded-xl hover:border-violet-500/40 group cursor-pointer transition-all duration-300 shadow-sm hover:shadow-violet-500/5 hover:-translate-y-0.5",
+        task.status === 'done' && "opacity-60 grayscale-[0.5] border-emerald-500/20"
+      )}
     >
       <div className="flex items-start justify-between mb-3">
         <PriorityBadge priority={task.priority} />
-        <button className="text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-zinc-900 rounded">
-          <MoreHorizontal size={14} />
-        </button>
+        {task.status === 'done' && (
+          <CheckCircle2 size={14} className="text-emerald-500" />
+        )}
       </div>
       
-      <h4 className="text-sm font-semibold text-zinc-200 mb-4 group-hover:text-white transition-colors line-clamp-2 leading-snug">
+      <h4 className={cn(
+        "text-sm font-semibold text-zinc-200 mb-4 group-hover:text-white transition-colors line-clamp-2 leading-snug",
+        task.status === 'done' && "line-through text-zinc-500"
+      )}>
         {task.title}
       </h4>
       
@@ -201,12 +243,11 @@ function TaskCard({ task, onClick }: TaskCardProps) {
               {new Date(task.due_date).toLocaleDateString()}
             </span>
           )}
-          <span className="text-[10px] text-zinc-600 font-bold flex items-center gap-1.5">
-            <MessageSquare size={12} className="text-zinc-700" />
-            {task.comment_count || 0}
-          </span>
+         <p className='text-[10px] text-zinc-600 font-bold uppercase tracking-tighter flex items-center gap-1.5'>open to view full details</p>
         </div>
-        <Avatar name={task.assignee_name || '?'} size="xs" />
+        {task.assignee_id && (
+          <Avatar name={task.assignee_name || ''} size="xs" />
+        )}
       </div>
     </div>
   );
@@ -220,11 +261,15 @@ interface SlideOverProps {
 
 function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const queryClient = useQueryClient();
+  const { workspaceId } = useParams<{ workspaceId: string }>();
   const [commentContent, setCommentContent] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
 
   const { data: taskResponse, isLoading: taskLoading } = useQuery({
     queryKey: ['task', taskId],
-    queryFn: () => getTasks(projectId).then(res => res.data.tasks.find(t => t.id === taskId)),
+    queryFn: () => getTasks(projectId).then(res => res.data.tasks.find((t: any) => t.id === taskId)),
   });
 
   const { data: commentsResponse } = useQuery({
@@ -233,13 +278,21 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
     enabled: !!taskId,
   });
 
+  const { data: membersResponse } = useQuery({
+    queryKey: ['workspace-members', workspaceId],
+    queryFn: () => getWorkspaceMembers(workspaceId!),
+    enabled: !!workspaceId,
+  });
+
   const task = taskResponse;
   const comments = commentsResponse?.data?.comments || [];
+  const members = membersResponse?.data?.members || [];
 
   const addCommentMutation = useMutation({
     mutationFn: (data: { content: string }) => addComment(projectId, taskId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       setCommentContent('');
       toast.success('Comment added');
     },
@@ -261,7 +314,31 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
     mutationFn: (commentId: string) => deleteComment(projectId, taskId, commentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       toast.success('Comment deleted');
+    }
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: (data: { commentId: string, content: string }) => updateComment(projectId, taskId, data.commentId, { content: data.content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      setEditingCommentId(null);
+      toast.success('Comment updated');
+    }
+  });
+
+  const deleteTaskMutation = useMutation({
+
+    mutationFn: () => deleteTask(projectId, taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      toast.success('Task deleted');
+      onClose();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete task');
     }
   });
 
@@ -276,16 +353,31 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
         <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/50 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <span className="p-2 bg-violet-500/10 rounded-xl">
-              <CheckCircle2 className="text-violet-400" size={18} />
+              <CheckCircle2 className={cn("text-violet-400", task?.status === 'done' && "text-emerald-500")} size={18} />
             </span>
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Task Details</span>
+            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              {task?.status === 'done' ? 'Completed Task' : 'Task Details'}
+            </span>
           </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-zinc-100 transition-all font-bold"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this task?')) {
+                  deleteTaskMutation.mutate();
+                }
+              }}
+              className="p-2 rounded-full hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
+              title="Delete task"
+            >
+              <Trash2 size={18} />
+            </button>
+            <button 
+              onClick={onClose} 
+              className="p-2 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-zinc-100 transition-all font-bold"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -296,6 +388,17 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
             </div>
           ) : (
             <>
+              {task?.status === 'done' && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <CheckCircle2 size={18} className="text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-400">Task Completed</p>
+                    <p className="text-xs text-emerald-500/70">This task has been finalized and is now read-only.</p>
+                  </div>
+                </div>
+              )}
               <div>
                 <h3 className="text-2xl font-bold text-white mb-6 leading-tight">{task?.title}</h3>
                 <div className="grid grid-cols-2 gap-y-8 gap-x-12">
@@ -327,18 +430,37 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
                   </div>
                   <div className="space-y-2">
                     <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest px-1">Assignee</p>
-                    <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2">
-                      <Avatar name={task?.assignee_name || '?'} size="xs" />
-                      <span className="text-sm font-semibold text-zinc-300 truncate">{task?.assignee_name || 'Unassigned'}</span>
+                    <div className="relative">
+                      <select 
+                        value={task?.assignee_id || ''}
+                        onChange={(e) => updateTaskMutation.mutate({ assigneeId: e.target.value })}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500/40 transition-all cursor-pointer appearance-none lowercase font-semibold"
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((member: any) => (
+                          <option key={member.id} value={member.id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        {task?.assignee_id ? (
+                          <Avatar name={task?.assignee_name || ''} size="xs" />
+                        ) : (
+                          <ChevronDown size={14} className="text-zinc-500" />
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest px-1">Due Date</p>
-                    <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5">
-                      <Calendar size={14} className="text-zinc-600" />
-                      <span className="text-sm font-semibold text-zinc-300">
-                        {task?.due_date ? new Date(task.due_date).toLocaleDateString() : 'No date set'}
-                      </span>
+                    <div className="relative">
+                      <input 
+                        type="date"
+                        value={task?.due_date ? new Date(task.due_date).toISOString().split('T')[0] : ''}
+                        onChange={(e) => updateTaskMutation.mutate({ dueDate: e.target.value })}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500/40 transition-all cursor-pointer appearance-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -357,9 +479,9 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
                   <span className="text-[10px] font-bold bg-zinc-900 px-2 py-0.5 rounded-full text-zinc-500">{comments.length}</span>
                 </div>
                 <div className="space-y-8 pl-1">
-                  {comments.map((comment) => (
+                  {comments.map((comment: any) => (
                     <div key={comment.id} className="flex gap-4 group">
-                      <Avatar name={comment.user_name} size="sm" />
+                      <Avatar name={comment.user_name || ''} size="sm" />
                       <div className="flex-1 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-900 group-hover:bg-zinc-900/80 transition-all relative">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-zinc-200">{comment.user_name}</span>
@@ -367,16 +489,53 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
                             {formatRelativeDate(comment.created_at)}
                           </span>
                         </div>
-                        <p className="text-sm text-zinc-400 leading-relaxed font-medium">{comment.content}</p>
-                        <button 
-                          onClick={() => deleteCommentMutation.mutate(comment.id)}
-                          className="absolute -top-2 -right-2 p-1.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shadow-xl"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        
+                        {editingCommentId === comment.id ? (
+                          <div className="space-y-3">
+                            <textarea 
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-500/40 min-h-[80px] resize-none"
+                              autoFocus
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="ghost" size="sm" onClick={() => setEditingCommentId(null)}>Cancel</Button>
+                              <Button 
+                                size="sm" 
+                                onClick={() => updateCommentMutation.mutate({ commentId: comment.id, content: editValue })}
+                                isLoading={updateCommentMutation.isPending}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-zinc-400 leading-relaxed font-medium">{comment.content}</p>
+                        )}
+
+                        <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button 
+                            onClick={() => {
+                              setEditingCommentId(comment.id);
+                              setEditValue(comment.content);
+                            }}
+                            className="p-1.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-500 hover:text-violet-400 shadow-xl"
+                            title="Edit comment"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button 
+                            onClick={() => deleteCommentMutation.mutate(comment.id)}
+                            className="p-1.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-500 hover:text-red-400 shadow-xl"
+                            title="Delete comment"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
+
                   {comments.length === 0 && (
                     <div className="text-center py-6">
                       <p className="text-xs text-zinc-700 font-bold uppercase tracking-widest italic">No comments yet</p>
@@ -414,14 +573,13 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   );
 }
 
-function AddTaskSlideOver({ projectId, onClose }: { projectId: string, onClose: () => void }) {
+function AddTaskSlideOver({ projectId, initialStatus = 'todo', onClose }: { projectId: string, initialStatus?: Task['status'], onClose: () => void }) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    status: 'todo' as Task['status'],
+    status: initialStatus,
     priority: 'medium' as Task['priority'],
-    due_date: ''
   });
 
   const mutation = useMutation({
@@ -491,13 +649,6 @@ function AddTaskSlideOver({ projectId, onClose }: { projectId: string, onClose: 
             </div>
           </div>
 
-          <Input 
-            type="date"
-            label="Due Date"
-            value={formData.due_date}
-            onChange={(e) => setFormData({...formData, due_date: e.target.value})}
-          />
-
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 font-mono">Description</label>
             <textarea 
@@ -517,3 +668,4 @@ function AddTaskSlideOver({ projectId, onClose }: { projectId: string, onClose: 
     </div>
   );
 }
+

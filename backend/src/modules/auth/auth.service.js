@@ -195,13 +195,15 @@ export async function resetPassword(token, newPassword) {
   return { message: 'Password reset successfully' };
 }
 
-export async function updateProfile(userId, { name }) {
+export async function updateProfile(userId, { name, avatarUrl }) {
   const result = await db.query(
     `UPDATE users 
-     SET name = $1, updated_at = NOW() 
-     WHERE id = $2 
+     SET name = COALESCE($1, name),
+         avatar_url = COALESCE($2, avatar_url),
+         updated_at = NOW() 
+     WHERE id = $3 
      RETURNING id, name, email, avatar_url, created_at`,
-    [name, userId]
+    [name, avatarUrl, userId]
   );
   const updatedUser = result.rows[0];
 

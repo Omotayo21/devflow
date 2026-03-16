@@ -84,3 +84,16 @@ export async function deleteComment(req, res, next) {
     next(err);
   }
 }
+
+export async function updateComment(req, res, next) {
+  try {
+    const comment = await tasksService.updateComment(
+      req.params.commentId,
+      req.body.content,
+      req.user.userId
+    );
+    res.json({ status: 'success', data: { comment } });
+  } catch (err) {
+    next(err);
+  }
+}

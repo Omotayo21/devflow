@@ -48,3 +48,15 @@ export async function updateProject(req, res, next) {
     next(err);
   }
 }
+
+export async function deleteProject(req, res, next) {
+  try {
+    const result = await projectsService.deleteProject(
+      req.params.projectId,
+      req.user.userId
+    );
+    res.json({ status: 'success', data: result });
+  } catch (err) {
+    next(err);
+  }
+}

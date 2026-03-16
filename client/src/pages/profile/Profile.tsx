@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { User as UserIcon, Lock, ShieldCheck, Mail, Camera } from 'lucide-react';
+import { User as UserIcon, Lock, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
@@ -11,7 +11,6 @@ import { Avatar } from '../../components/ui/Avatar';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email().optional(), // email is usually read-only
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -23,20 +22,17 @@ export default function Profile() {
   const { register, handleSubmit, formState: { errors } } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: user?.name,
-      email: user?.email,
+      name: user?.name || '',
     }
   });
 
   const onUpdateProfile = async (data: ProfileFormValues) => {
     setIsUpdating(true);
     try {
-      // Mocking update for now as backend might need specific endpoint
-      // await userApi.updateProfile(data);
-      updateUser({ ...user!, name: data.name });
+      await updateUser(data);
       toast.success('Profile updated successfully');
-    } catch (error) {
-       toast.error('Failed to update profile');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update profile');
     } finally {
       setIsUpdating(false);
     }
@@ -56,9 +52,6 @@ export default function Profile() {
              
              <div className="relative mb-6">
                 <Avatar name={user?.name} size="xl" className="ring-4 ring-zinc-900 shadow-2xl" />
-                <button className="absolute bottom-0 right-0 p-2 bg-violet-600 rounded-full text-white border-4 border-zinc-950 hover:bg-violet-500 transition-all shadow-lg">
-                  <Camera size={16} />
-                </button>
              </div>
 
              <h3 className="font-bold text-xl text-white mb-1">{user?.name}</h3>
@@ -66,17 +59,6 @@ export default function Profile() {
              
              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
                <ShieldCheck size={14} /> Verified Member
-             </div>
-
-             <div className="w-full pt-8 mt-8 border-t border-zinc-900 grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Role</p>
-                  <p className="text-sm font-semibold text-zinc-300">Engineer</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Joined</p>
-                  <p className="text-sm font-semibold text-zinc-300">Mar 2024</p>
-                </div>
              </div>
            </div>
         </div>
@@ -97,19 +79,6 @@ export default function Profile() {
                   error={errors.name?.message}
                   placeholder="Your Name"
                 />
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email Address</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-zinc-500 transition-colors" size={18} />
-                    <input 
-                      readOnly
-                      disabled
-                      value={user?.email}
-                      className="w-full bg-zinc-900/50 border border-zinc-800/50 rounded-2xl pl-12 pr-4 py-3.5 text-sm text-zinc-500 cursor-not-allowed font-medium"
-                    />
-                  </div>
-                  <p className="text-[10px] text-zinc-700 font-medium ml-1">Email cannot be changed after registration.</p>
-                </div>
               </div>
 
               <div className="pt-4 flex justify-end">
@@ -141,3 +110,4 @@ export default function Profile() {
     </div>
   );
 }
+

@@ -19,8 +19,9 @@ function validate(schema) {
 }
 
 const updateProfileSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
-});
+  name: Joi.string().min(2).max(100).optional(),
+  avatarUrl: Joi.string().uri().optional().allow(null, ''),
+}).or('name', 'avatarUrl');
 
 const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required(),
