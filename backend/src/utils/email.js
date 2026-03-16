@@ -2,18 +2,16 @@ import nodemailer from 'nodemailer';
 import { logger } from './logger.js';
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT),
-  secure: parseInt(process.env.EMAIL_PORT) === 465, // Use SSL for 465, STARTTLS for 587
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-  socketTimeout: 30000,
-  debug: true, // Enable debug logging in transporter
-  logger: true // Log transporter activity
+  connectionTimeout: 20000, // Increased for cloud stability
+  greetingTimeout: 20000,
+  socketTimeout: 60000,
+  debug: true, // Keep debug logging to monitor Railway logs
+  logger: true
 });
 
 const commonStyles = `
