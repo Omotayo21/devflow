@@ -1,21 +1,27 @@
 import axios from 'axios';
 import { logger } from './logger.js';
-
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const FROM_EMAIL = process.env.EMAIL_FROM || 'DevFlow <rufaiabdulrahman@gmail.com>';
-
-const brevoClient = axios.create({
-  baseURL: 'https://api.brevo.com/v3',
-  headers: {
-    'api-key': BREVO_API_KEY,
-    'content-type': 'application/json',
-    'accept': 'application/json'
-  }
-});
+import { config } from '../config/index.js';
 
 /**
- * Common styles for emails - standardized for Brevo
+ * Brevo client initialization. 
+ * Using a getter to ensure config is loaded before use.
  */
+const getBrevoClient = () => {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    logger.error('BREVO_API_KEY is missing from environment variables');
+  }
+  
+  return axios.create({
+    baseURL: 'https://api.brevo.com/v3',
+    headers: {
+      'api-key': apiKey,
+      'content-type': 'application/json',
+      'accept': 'application/json'
+    }
+  });
+};
+
 const commonStyles = `
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   max-width: 600px;
@@ -40,12 +46,13 @@ const buttonStyle = `
 
 async function sendEmail({ to, subject, htmlContent }) {
   try {
-    // Parse name and email from FROM_EMAIL string "Name <email@example.com>"
-    const fromMatch = FROM_EMAIL.match(/(.*)<(.*)>/);
+    const fromEmail = process.env.EMAIL_FROM || 'DevFlow <rufaiabdulrahman@gmail.com>';
+    const fromMatch = fromEmail.match(/(.*)<(.*)>/);
     const senderName = fromMatch ? fromMatch[1].trim() : 'DevFlow';
-    const senderEmail = fromMatch ? fromMatch[2].trim() : FROM_EMAIL;
+    const senderEmail = fromMatch ? fromMatch[2].trim() : fromEmail;
 
-    const response = await brevoClient.post('/smtp/email', {
+    const client = getBrevoClient();
+    const response = await client.post('/smtp/email', {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: to }],
       subject: subject,
@@ -82,7 +89,7 @@ export async function sendTaskAssignedEmail({
         <div style="border: 2px solid #7c3aed20; background-color: #7c3aed05; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
           <p style="margin: 0; font-weight: 600; color: #18181b;">${taskTitle}</p>
         </div>
-        <a href="${process.env.FRONTEND_URL}/workspaces/${workspaceId}/projects/${projectId}" style="${buttonStyle}">
+        <a href="${config.frontendUrl}/workspaces/${workspaceId}/projects/${projectId}" style="${buttonStyle}">
           View Task & Login
         </a>
         <hr style="margin-top: 40px; border: none; border-top: 1px solid #e4e4e7;" />
@@ -115,7 +122,7 @@ export async function sendWelcomeEmail({ name, email }) {
           <li style="margin-bottom: 8px;">Run projects with Kanban boards</li>
           <li style="margin-bottom: 8px;">Track tasks and collaborate in real-time</li>
         </ul>
-        <a href="${process.env.FRONTEND_URL}/login" style="${buttonStyle}">
+        <a href="${config.frontendUrl}/login" style="${buttonStyle}">
           Get Started
         </a>
         <hr style="margin-top: 40px; border: none; border-top: 1px solid #e4e4e7;" />
@@ -146,7 +153,7 @@ export async function sendPasswordResetEmail({ name, email, resetToken }) {
         <p style="font-size: 14px; color: #7c3aed; font-weight: 500;">
           This link expires in 1 hour.
         </p>
-        <a href="${process.env.FRONTEND_URL}/reset-password?token=${resetToken}" style="${buttonStyle}">
+        <a href="${config.frontendUrl}/reset-password?token=${resetToken}" style="${buttonStyle}">
           Reset Password
         </a>
         <p style="font-size: 14px; color: #a1a1aa; margin-top: 32px;">
@@ -185,7 +192,7 @@ export async function sendWorkspaceInviteEmail({
         <div style="border: 2px solid #7c3aed20; background-color: #7c3aed05; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
           <p style="margin: 0; font-weight: 600; color: #18181b;">Join your team and start collaborating!</p>
         </div>
-        <a href="${process.env.FRONTEND_URL}/login" style="${buttonStyle}">
+        <a href="${config.frontendUrl}/login" style="${buttonStyle}">
           Accept Invitation & Login
         </a>
         <hr style="margin-top: 40px; border: none; border-top: 1px solid #e4e4e7;" />
@@ -202,3 +209,4 @@ export async function sendWorkspaceInviteEmail({
     htmlContent
   });
 }
+
