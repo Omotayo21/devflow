@@ -7,7 +7,7 @@ import { config } from '../config/index.js';
  * Using a getter to ensure config is loaded before use.
  */
 const getBrevoClient = () => {
-  const apiKey = config.brevo.apiKey;
+  const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
     logger.error('BREVO_API_KEY is missing from environment variables');
   }
@@ -46,7 +46,7 @@ const buttonStyle = `
 
 async function sendEmail({ to, subject, htmlContent }) {
   try {
-    const fromEmail = config.email.from;
+    const fromEmail = process.env.EMAIL_FROM || 'DevFlow <rufaiabdulrahman@gmail.com>';
     const fromMatch = fromEmail.match(/(.*)<(.*)>/);
     const senderName = fromMatch ? fromMatch[1].trim() : 'DevFlow';
     const senderEmail = fromMatch ? fromMatch[2].trim() : fromEmail;
@@ -147,7 +147,7 @@ export async function sendPasswordResetEmail({ name, email, resetToken }) {
         <h1 style="color: #7c3aed; margin-bottom: 24px; font-size: 24px;">DevFlow</h1>
         <h2 style="font-size: 20px; margin-bottom: 16px;">Reset your password</h2>
         <p style="font-size: 16px; color: #52525b; margin-bottom: 16px;">Hi ${name},</p>
-        <p style="font-size: 16px; color: #52525b; margin-6px;">
+        <p style="font-size: 16px; color: #52525b; margin-bottom: 16px;">
           We received a request to reset your password. Click the button below to proceed:
         </p>
         <p style="font-size: 14px; color: #7c3aed; font-weight: 500;">
