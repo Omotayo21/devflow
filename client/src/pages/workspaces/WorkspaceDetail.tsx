@@ -141,7 +141,7 @@ function ProjectsTab({ workspaceId }: { workspaceId: string }) {
   const deleteMutation = useMutation({
     mutationFn: (projectId: string) => deleteProject(workspaceId, projectId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['projects', user?.id, workspaceId] });
       toast.success('Project deleted');
     },
     onError: (error: any) => {
@@ -224,7 +224,7 @@ function ProjectsTab({ workspaceId }: { workspaceId: string }) {
         <CreateProjectForm 
           workspaceId={workspaceId}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['projects', workspaceId] });
+            queryClient.invalidateQueries({ queryKey: ['projects', user?.id, workspaceId] });
             setIsModalOpen(false);
           }}
           onCancel={() => setIsModalOpen(false)}
@@ -314,7 +314,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
         <InviteMemberForm 
           workspaceId={workspaceId}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['members', workspaceId] });
+            queryClient.invalidateQueries({ queryKey: ['members', user?.id, workspaceId] });
             setIsInviteOpen(false);
           }}
           onCancel={() => setIsInviteOpen(false)}

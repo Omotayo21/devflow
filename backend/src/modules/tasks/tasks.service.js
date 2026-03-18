@@ -136,7 +136,7 @@ export async function updateTask(taskId, updates, userId) {
   const task = taskResult.rows[0];
 
   // Logic: Member should not be able to assign task, only owners can
-  if (updates.assigneeId && updates.assigneeId !== task.assignee_id && task.role !== 'owner') {
+  if (assigneeId && assigneeId !== task.assignee_id && task.role !== 'owner') {
     throw new AppError('Only the workspace owner can assign tasks', 403);
   }
 
@@ -155,7 +155,7 @@ export async function updateTask(taskId, updates, userId) {
   );
 
   // If task was assigned to someone, queue notification email
-  if (assigneeId && assigneeId !== task.rows[0].assignee_id) {
+  if (assigneeId && assigneeId !== task.assignee_id) {
     const assignee = await db.query(
       'SELECT name, email FROM users WHERE id = $1',
       [assigneeId]
@@ -168,7 +168,7 @@ export async function updateTask(taskId, updates, userId) {
 
     const projectData = await db.query(
       'SELECT name FROM projects WHERE id = $1',
-      [task.rows[0].project_id]
+      [task.project_id]
     );
 
     if (assignee.rows[0]) {
@@ -187,7 +187,7 @@ export async function updateTask(taskId, updates, userId) {
 
   const project = await db.query(
   'SELECT workspace_id FROM projects WHERE id = $1',
-  [task.rows[0].project_id]
+  [task.project_id]
 );
 
 await logActivity({

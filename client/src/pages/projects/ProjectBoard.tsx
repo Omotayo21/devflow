@@ -296,8 +296,8 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const addCommentMutation = useMutation({
     mutationFn: (data: { content: string }) => addComment(projectId, taskId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['comments', user?.id, taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
       setCommentContent('');
       toast.success('Comment added');
     },
@@ -309,8 +309,8 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const updateTaskMutation = useMutation({
     mutationFn: (data: Partial<Task>) => updateTask(projectId, taskId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
+      queryClient.invalidateQueries({ queryKey: ['task', user?.id, taskId] });
       toast.success('Task updated');
     },
     onError: (error: any) => {
@@ -321,8 +321,8 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const deleteCommentMutation = useMutation({
     mutationFn: (commentId: string) => deleteComment(projectId, taskId, commentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['comments', user?.id, taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
       toast.success('Comment deleted');
     }
   });
@@ -330,8 +330,8 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const updateCommentMutation = useMutation({
     mutationFn: (data: { commentId: string, content: string }) => updateComment(projectId, taskId, data.commentId, { content: data.content }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['comments', user?.id, taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
       setEditingCommentId(null);
       toast.success('Comment updated');
     }
@@ -341,7 +341,7 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
 
     mutationFn: () => deleteTask(projectId, taskId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
       toast.success('Task deleted');
       onClose();
     },
@@ -606,7 +606,7 @@ function AddTaskSlideOver({ projectId, initialStatus = 'todo', onClose }: { proj
   const mutation = useMutation({
     mutationFn: (data: Partial<Task>) => createTask(projectId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id, projectId] });
       toast.success('Task created successfully!');
       onClose();
     },

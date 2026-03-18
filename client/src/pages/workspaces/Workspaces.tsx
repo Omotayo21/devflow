@@ -75,7 +75,7 @@ export default function Workspaces() {
         <p className="text-zinc-500 text-sm mb-6 -mt-2">A workspace helps you organize projects and teams.</p>
         <CreateWorkspaceForm 
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+            queryClient.invalidateQueries({ queryKey: ['workspaces', user?.id] });
             setIsModalOpen(false);
           }}
           onCancel={() => setIsModalOpen(false)}
