@@ -381,20 +381,24 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {task?.role === 'owner' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to delete this task?')) {
+                    deleteTaskMutation.mutate();
+                  }
+                }}
+                className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-8"
+              >
+                <Trash2 size={14} className="mr-2" />
+                Delete Task
+              </Button>
+            )}
             <button 
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this task?')) {
-                  deleteTaskMutation.mutate();
-                }
-              }}
-              className="p-2 rounded-full hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
-              title="Delete task"
-            >
-              <Trash2 size={18} />
-            </button>
-            <button 
-              onClick={onClose} 
-              className="p-2 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-zinc-100 transition-all font-bold"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-zinc-900 text-zinc-500 transition-all"
             >
               <X size={20} />
             </button>

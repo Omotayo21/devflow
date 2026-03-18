@@ -200,24 +200,32 @@ export async function updateTask(taskId, updates, userId) {
 }
 
 export async function deleteTask(taskId, userId) {
-  const task = await db.query(
-    `SELECT t.* FROM tasks t
+  const taskResult = await db.query(
+    `SELECT t.*, wm.role, p.workspace_id FROM tasks t
      JOIN projects p ON t.project_id = p.id
      JOIN workspace_members wm ON p.workspace_id = wm.workspace_id
      WHERE t.id = $1 AND wm.user_id = $2`,
     [taskId, userId]
   );
 
-  if (task.rows.length === 0) {
+  if (taskResult.rows.length === 0) {
     throw new AppError('Task not found or access denied', 404);
   }
 
-  if (task.rows[0].created_by !== userId) {
-    throw new AppError('Only the task creator can delete this task', 403);
+  const task = taskResult.rows[0];
+
+  // Logic: Only the workspace owner can delete tasks
+  if (task.role !== 'owner') {
+    throw new AppError('Only the workspace owner can delete tasks', 403);
   }
 
   await db.query('DELETE FROM tasks WHERE id = $1', [taskId]);
-  await invalidate(`projects:workspace:${task.rows[0].workspace_id}`);
+  
+  // Non-blocking invalidation
+  invalidate(`projects:workspace:${task.workspace_id}`).catch(err => 
+    console.error('Delete invalidation error:', err)
+  );
+
   return { message: 'Task deleted successfully' };
 }
 export async function createComment({ content, taskId }, userId) {
