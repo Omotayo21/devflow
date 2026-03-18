@@ -602,6 +602,7 @@ function TaskDetailSlideOver({ taskId, projectId, userRole, onClose }: SlideOver
 
 function AddTaskSlideOver({ projectId, initialStatus = 'todo', onClose }: { projectId: string, initialStatus?: Task['status'], onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
