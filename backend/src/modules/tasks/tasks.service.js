@@ -30,20 +30,52 @@ export async function createTask({
     [title, description, status || 'todo', priority || 'medium',
      assigneeId, dueDate, projectId, userId]
   );
-// Get workspace_id for activity log
-const project = await db.query(
-  'SELECT workspace_id FROM projects WHERE id = $1',
-  [projectId]
-);
+  // Non-blocking operations: activity log and email notification
+  try {
+    const project = await db.query(
+      'SELECT workspace_id, name FROM projects WHERE id = $1',
+      [projectId]
+    );
 
-await logActivity({
-  action: 'task.created',
-  entityType: 'task',
-  entityId: result.rows[0].id,
-  userId,
-  workspaceId: project.rows[0].workspace_id,
-  metadata: { taskTitle: title },
-});
+    if (project.rows[0]) {
+      const workspaceId = project.rows[0].workspace_id;
+      
+      // Log activity
+      await logActivity({
+        action: 'task.created',
+        entityType: 'task',
+        entityId: result.rows[0].id,
+        userId,
+        workspaceId,
+        metadata: { taskTitle: title },
+      });
+
+      // Send email if assigned during creation
+      if (assigneeId) {
+        const [assignee, assigner] = await Promise.all([
+          db.query('SELECT name, email FROM users WHERE id = $1', [assigneeId]),
+          db.query('SELECT name FROM users WHERE id = $1', [userId])
+        ]);
+
+        if (assignee.rows[0] && assigner.rows[0]) {
+          await emailQueue.add('task.assigned', {
+            type: 'task.assigned',
+            data: {
+              assigneeName: assignee.rows[0].name,
+              assigneeEmail: assignee.rows[0].email,
+              taskTitle: result.rows[0].title,
+              projectName: project.rows[0].name,
+              assignedByName: assigner.rows[0].name,
+            },
+          }).catch(err => logger.error({ err }, 'Failed to queue creation email'));
+        }
+      }
+    }
+  } catch (err) {
+    // Log but don't fail the task creation
+    console.error('Post-creation error:', err);
+  }
+
   return result.rows[0];
 }
 
@@ -156,32 +188,36 @@ export async function updateTask(taskId, updates, userId) {
 
   // If task was assigned to someone, queue notification email
   if (assigneeId && assigneeId !== task.assignee_id) {
-    const assignee = await db.query(
-      'SELECT name, email FROM users WHERE id = $1',
-      [assigneeId]
-    );
+    try {
+      const assignee = await db.query(
+        'SELECT name, email FROM users WHERE id = $1',
+        [assigneeId]
+      );
 
-    const assigner = await db.query(
-      'SELECT name FROM users WHERE id = $1',
-      [userId]
-    );
+      const assigner = await db.query(
+        'SELECT name FROM users WHERE id = $1',
+        [userId]
+      );
 
-    const projectData = await db.query(
-      'SELECT name FROM projects WHERE id = $1',
-      [task.project_id]
-    );
+      const projectData = await db.query(
+        'SELECT name FROM projects WHERE id = $1',
+        [task.project_id]
+      );
 
-    if (assignee.rows[0]) {
-      await emailQueue.add('task.assigned', {
-        type: 'task.assigned',
-        data: {
-          assigneeName: assignee.rows[0].name,
-          assigneeEmail: assignee.rows[0].email,
-          taskTitle: result.rows[0].title,
-          projectName: projectData.rows[0].name,
-          assignedByName: assigner.rows[0].name,
-        },
-      });
+      if (assignee.rows[0]) {
+        await emailQueue.add('task.assigned', {
+          type: 'task.assigned',
+          data: {
+            assigneeName: assignee.rows[0].name,
+            assigneeEmail: assignee.rows[0].email,
+            taskTitle: result.rows[0].title,
+            projectName: projectData.rows[0].name,
+            assignedByName: assigner.rows[0].name,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to queue assignment email:', err);
     }
   }
 
