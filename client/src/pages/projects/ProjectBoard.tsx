@@ -149,6 +149,7 @@ export default function ProjectBoard() {
         <TaskDetailSlideOver 
           taskId={selectedTaskId}
           projectId={projectId!}
+          userRole={workspace?.my_role}
           onClose={() => setSelectedTaskId(null)}
         />
       )}
@@ -259,10 +260,11 @@ function TaskCard({ task, onClick }: TaskCardProps) {
 interface SlideOverProps {
   taskId: string;
   projectId: string;
+  userRole?: string;
   onClose: () => void;
 }
 
-function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
+function TaskDetailSlideOver({ taskId, projectId, userRole, onClose }: SlideOverProps) {
   const queryClient = useQueryClient();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [commentContent, setCommentContent] = useState('');
@@ -381,7 +383,7 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {task?.role === 'owner' && (
+            {userRole === 'owner' && (
               <Button
                 variant="ghost"
                 size="sm"
