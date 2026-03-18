@@ -6,7 +6,7 @@ import { invalidate } from '../../utils/cache.js';
 
 async function verifyProjectAccess(projectId, userId) {
   const result = await db.query(
-    `SELECT p.id FROM projects p
+    `SELECT p.id, p.workspace_id FROM projects p
      JOIN workspace_members wm ON p.workspace_id = wm.workspace_id
      WHERE p.id = $1 AND wm.user_id = $2`,
     [projectId, userId]
@@ -14,13 +14,14 @@ async function verifyProjectAccess(projectId, userId) {
   if (result.rows.length === 0) {
     throw new AppError('Project not found or access denied', 403);
   }
+  return result.rows[0];
 }
 
 export async function createTask({
   title, description, status, priority,
   assigneeId, dueDate, projectId
 }, userId) {
-  await verifyProjectAccess(projectId, userId);
+  const project = await verifyProjectAccess(projectId, userId);
 
   const result = await db.query(
     `INSERT INTO tasks 
@@ -28,26 +29,26 @@ export async function createTask({
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [title, description, status || 'todo', priority || 'medium',
-     assigneeId, dueDate, projectId, userId]
+     assigneeId || null, dueDate || null, projectId, userId]
   );
-  // Non-blocking activity log
-  db.query(
-    'SELECT workspace_id FROM projects WHERE id = $1',
-    [projectId]
-  ).then(project => {
-    if (project.rows[0]) {
-      logActivity({
-        action: 'task.created',
-        entityType: 'task',
-        entityId: result.rows[0].id,
-        userId,
-        workspaceId: project.rows[0].workspace_id,
-        metadata: { taskTitle: title },
-      });
-    }
-  }).catch(err => console.error('Post-creation activity log failed:', err));
 
-  return result.rows[0];
+  const newTask = result.rows[0];
+
+  // Fire-and-forget background tasks (Log activity)
+  try {
+    logActivity({
+      action: 'task.created',
+      entityType: 'task',
+      entityId: newTask.id,
+      userId,
+      workspaceId: project.workspace_id,
+      metadata: { taskTitle: title },
+    }).catch(err => console.error('Background log error:', err));
+  } catch (err) {
+    console.error('Task post-creation setup error:', err);
+  }
+
+  return newTask;
 }
 
 export async function getProjectTasks(projectId, userId, query) {
