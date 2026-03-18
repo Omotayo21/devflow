@@ -2,6 +2,21 @@ import { db } from '../../db/index.js';
 import { AppError } from '../../middleware/errorHandler.js';
 
 export async function getWorkspaceActivity(workspaceId, userId, query) {
+  // Prevent "Access Denied" if workspaceId is invalid or loading
+  if (!workspaceId || workspaceId === 'null' || workspaceId === 'undefined') {
+    return {
+      activities: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
+  }
+
   // Verify membership
   const member = await db.query(
     `SELECT id FROM workspace_members 

@@ -30,51 +30,22 @@ export async function createTask({
     [title, description, status || 'todo', priority || 'medium',
      assigneeId, dueDate, projectId, userId]
   );
-  // Non-blocking operations: activity log and email notification
-  try {
-    const project = await db.query(
-      'SELECT workspace_id, name FROM projects WHERE id = $1',
-      [projectId]
-    );
-
+  // Non-blocking activity log
+  db.query(
+    'SELECT workspace_id FROM projects WHERE id = $1',
+    [projectId]
+  ).then(project => {
     if (project.rows[0]) {
-      const workspaceId = project.rows[0].workspace_id;
-      
-      // Log activity
-      await logActivity({
+      logActivity({
         action: 'task.created',
         entityType: 'task',
         entityId: result.rows[0].id,
         userId,
-        workspaceId,
+        workspaceId: project.rows[0].workspace_id,
         metadata: { taskTitle: title },
       });
-
-      // Send email if assigned during creation
-      if (assigneeId) {
-        const [assignee, assigner] = await Promise.all([
-          db.query('SELECT name, email FROM users WHERE id = $1', [assigneeId]),
-          db.query('SELECT name FROM users WHERE id = $1', [userId])
-        ]);
-
-        if (assignee.rows[0] && assigner.rows[0]) {
-          await emailQueue.add('task.assigned', {
-            type: 'task.assigned',
-            data: {
-              assigneeName: assignee.rows[0].name,
-              assigneeEmail: assignee.rows[0].email,
-              taskTitle: result.rows[0].title,
-              projectName: project.rows[0].name,
-              assignedByName: assigner.rows[0].name,
-            },
-          }).catch(err => logger.error({ err }, 'Failed to queue creation email'));
-        }
-      }
     }
-  } catch (err) {
-    // Log but don't fail the task creation
-    console.error('Post-creation error:', err);
-  }
+  }).catch(err => console.error('Post-creation activity log failed:', err));
 
   return result.rows[0];
 }
@@ -186,26 +157,16 @@ export async function updateTask(taskId, updates, userId) {
     [title, description, status, priority, assigneeId, dueDate, taskId]
   );
 
-  // If task was assigned to someone, queue notification email
+  // Non-blocking operations: email notification and activity log
   if (assigneeId && assigneeId !== task.assignee_id) {
-    try {
-      const assignee = await db.query(
-        'SELECT name, email FROM users WHERE id = $1',
-        [assigneeId]
-      );
-
-      const assigner = await db.query(
-        'SELECT name FROM users WHERE id = $1',
-        [userId]
-      );
-
-      const projectData = await db.query(
-        'SELECT name FROM projects WHERE id = $1',
-        [task.project_id]
-      );
-
-      if (assignee.rows[0]) {
-        await emailQueue.add('task.assigned', {
+    // Fire and forget assignment email
+    Promise.all([
+      db.query('SELECT name, email FROM users WHERE id = $1', [assigneeId]),
+      db.query('SELECT name FROM users WHERE id = $1', [userId]),
+      db.query('SELECT name FROM projects WHERE id = $1', [task.project_id])
+    ]).then(([assignee, assigner, projectData]) => {
+      if (assignee.rows[0] && assigner.rows[0] && projectData.rows[0]) {
+        emailQueue.add('task.assigned', {
           type: 'task.assigned',
           data: {
             assigneeName: assignee.rows[0].name,
@@ -214,26 +175,27 @@ export async function updateTask(taskId, updates, userId) {
             projectName: projectData.rows[0].name,
             assignedByName: assigner.rows[0].name,
           },
-        });
+        }).catch(err => console.error('Assignment email queue error:', err));
       }
-    } catch (err) {
-      console.error('Failed to queue assignment email:', err);
-    }
+    }).catch(err => console.error('Assignment email data fetch error:', err));
   }
 
-  const project = await db.query(
-  'SELECT workspace_id FROM projects WHERE id = $1',
-  [task.project_id]
-);
+  db.query(
+    'SELECT workspace_id FROM projects WHERE id = $1',
+    [task.project_id]
+  ).then(project => {
+    if (project.rows[0]) {
+      logActivity({
+        action: 'task.updated',
+        entityType: 'task',
+        entityId: taskId,
+        userId,
+        workspaceId: project.rows[0].workspace_id,
+        metadata: { updates },
+      });
+    }
+  }).catch(err => console.error('Update activity log error:', err));
 
-await logActivity({
-  action: 'task.updated',
-  entityType: 'task',
-  entityId: taskId,
-  userId,
-  workspaceId: project.rows[0].workspace_id,
-  metadata: { updates },
-});
   return result.rows[0];
 }
 
