@@ -27,16 +27,17 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const { data: workspacesResponse, isLoading: wsLoading } = useQuery({
-    queryKey: ['workspaces'],
+    queryKey: ['workspaces', user?.id],
     queryFn: getWorkspaces,
+    enabled: !!user?.id,
   });
 
   const workspaces = (workspacesResponse as any)?.data?.workspaces || [];
 
   const { data: activityResponse, isLoading: actLoading } = useQuery({
-    queryKey: ['activity', activeWorkspaceId],
+    queryKey: ['activity', user?.id, activeWorkspaceId],
     queryFn: () => getWorkspaceActivity(activeWorkspaceId!, { limit: 5 }),
-    enabled: !!activeWorkspaceId,
+    enabled: !!user?.id && !!activeWorkspaceId,
   });
 
   const activities = (activityResponse as any)?.data?.activities || [];

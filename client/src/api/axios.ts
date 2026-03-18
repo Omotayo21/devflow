@@ -46,6 +46,14 @@ api.interceptors.response.use(
 
     // If 401 and not already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't try to refresh if we're on a public auth route (login/register)
+      const isAuthRoute = originalRequest.url?.includes('/auth/login') ||
+                         originalRequest.url?.includes('/auth/register');
+
+      if (isAuthRoute) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });

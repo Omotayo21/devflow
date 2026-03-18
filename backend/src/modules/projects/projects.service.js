@@ -35,11 +35,12 @@ export async function getWorkspaceProjects(workspaceId, userId) {
           COUNT(DISTINCT t.id) AS task_count
          FROM projects p
          JOIN users u ON p.created_by = u.id
+         JOIN workspace_members wm ON p.workspace_id = wm.workspace_id
          LEFT JOIN tasks t ON p.id = t.project_id
-         WHERE p.workspace_id = $1
+         WHERE p.workspace_id = $1 AND wm.user_id = $2
          GROUP BY p.id, u.name
          ORDER BY p.created_at DESC`,
-        [workspaceId]
+        [workspaceId, userId]
       );
       return result.rows;
     },

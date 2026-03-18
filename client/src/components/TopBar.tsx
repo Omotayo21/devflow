@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bell, Search, Menu, X, FolderKanban, CheckSquare, Loader2 } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '../stores/uiStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
 import { getWorkspaceActivity } from '../api/activities';
 import { searchWorkspace } from '../api/search';
@@ -35,19 +36,20 @@ export default function TopBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const { user } = useAuthStore();
   // Search query
   const { data: searchResults, isLoading: searchLoading } = useQuery({
-    queryKey: ['search', activeWorkspaceId, searchQuery],
+    queryKey: ['search', user?.id, activeWorkspaceId, searchQuery],
     queryFn: () => searchWorkspace(activeWorkspaceId!, searchQuery),
-    enabled: !!activeWorkspaceId && searchQuery.length >= 2,
+    enabled: !!user?.id && !!activeWorkspaceId && searchQuery.length >= 2,
     staleTime: 1000 * 30,
   });
 
   // Notifications (recent activity)
   const { data: notifResponse } = useQuery({
-    queryKey: ['notifications', activeWorkspaceId],
+    queryKey: ['notifications', user?.id, activeWorkspaceId],
     queryFn: () => getWorkspaceActivity(activeWorkspaceId!, { limit: 10 }),
-    enabled: !!activeWorkspaceId,
+    enabled: !!user?.id && !!activeWorkspaceId,
   });
 
   const notifications = (notifResponse as any)?.data?.activities || [];

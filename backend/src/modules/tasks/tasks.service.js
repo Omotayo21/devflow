@@ -121,17 +121,23 @@ export async function getProjectTasks(projectId, userId, query) {
 export async function updateTask(taskId, updates, userId) {
   const { title, description, status, priority, assigneeId, dueDate } = updates;
 
-  const task = await db.query(
-    `SELECT t.* FROM tasks t
-     JOIN workspace_members wm ON (
-       SELECT workspace_id FROM projects WHERE id = t.project_id
-     ) = wm.workspace_id
+  const taskResult = await db.query(
+    `SELECT t.*, wm.role FROM tasks t
+     JOIN projects p ON t.project_id = p.id
+     JOIN workspace_members wm ON p.workspace_id = wm.workspace_id
      WHERE t.id = $1 AND wm.user_id = $2`,
     [taskId, userId]
   );
 
-  if (task.rows.length === 0) {
+  if (taskResult.rows.length === 0) {
     throw new AppError('Task not found or access denied', 404);
+  }
+
+  const task = taskResult.rows[0];
+
+  // Logic: Member should not be able to assign task, only owners can
+  if (updates.assigneeId && updates.assigneeId !== task.assignee_id && task.role !== 'owner') {
+    throw new AppError('Only the workspace owner can assign tasks', 403);
   }
 
   const result = await db.query(

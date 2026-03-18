@@ -16,7 +16,7 @@ import { useUIStore } from '../stores/uiStore';
 import { cn } from '../utils/cn';
 import { Avatar } from './ui/Avatar';
 import { getWorkspaces } from '../api/workspaces';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -30,8 +30,9 @@ export default function Sidebar() {
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
 
   const { data: workspacesResponse } = useQuery({
-    queryKey: ['workspaces'],
-    queryFn: getWorkspaces
+    queryKey: ['workspaces', user?.id],
+    queryFn: getWorkspaces,
+    enabled: !!user?.id
   });
 
   const workspaces = (workspacesResponse as any)?.data?.workspaces || [];
@@ -43,7 +44,10 @@ export default function Sidebar() {
     }
   }, [workspaces, activeWorkspaceId, setActiveWorkspace]);
 
+  const queryClient = useQueryClient();
+
   const handleLogout = () => {
+    queryClient.clear();
     logout();
     navigate('/login');
   };

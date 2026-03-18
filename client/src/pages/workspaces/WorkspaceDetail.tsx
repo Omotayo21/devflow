@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { 
   FolderKanban, 
   Users, 
@@ -31,10 +32,11 @@ export default function WorkspaceDetail() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('projects');
 
+  const { user } = useAuthStore();
   const { data: workspaceResponse, isLoading: wsLoading, isError } = useQuery({
-    queryKey: ['workspace', workspaceId],
+    queryKey: ['workspace', user?.id, workspaceId],
     queryFn: () => getWorkspaceById(workspaceId!),
-    enabled: !!workspaceId,
+    enabled: !!user?.id && !!workspaceId,
   });
 
   const workspace = (workspaceResponse as any)?.data?.workspace;
@@ -127,9 +129,11 @@ function ProjectsTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const { user } = useAuthStore();
   const { data: projectsResponse, isLoading } = useQuery({
-    queryKey: ['projects', workspaceId],
+    queryKey: ['projects', user?.id, workspaceId],
     queryFn: () => getProjects(workspaceId),
+    enabled: !!user?.id,
   });
 
   const projects = projectsResponse?.data?.projects || [];
@@ -234,9 +238,11 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  const { user } = useAuthStore();
   const { data: response, isLoading } = useQuery({
-    queryKey: ['members', workspaceId],
+    queryKey: ['members', user?.id, workspaceId],
     queryFn: () => getWorkspaceMembers(workspaceId),
+    enabled: !!user?.id,
   });
 
   const members = response?.data?.members || [];
@@ -319,9 +325,11 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
 }
 
 function ActivityTab({ workspaceId }: { workspaceId: string }) {
+  const { user } = useAuthStore();
   const { data: response, isLoading } = useQuery({
-    queryKey: ['activity', workspaceId],
+    queryKey: ['activity', user?.id, workspaceId],
     queryFn: () => getWorkspaceActivity(workspaceId, { limit: 50 }),
+    enabled: !!user?.id,
   });
 
   const activities = response?.data?.activities || [];

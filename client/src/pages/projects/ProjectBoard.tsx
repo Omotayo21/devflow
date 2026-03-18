@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { 
   Plus, 
   Filter, 
@@ -49,22 +50,23 @@ export default function ProjectBoard() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [initialAddStatus, setInitialAddStatus] = useState<Task['status']>('todo');
 
+  const { user } = useAuthStore();
   const { data: workspaceResponse } = useQuery({
-    queryKey: ['workspace', workspaceId],
+    queryKey: ['workspace', user?.id, workspaceId],
     queryFn: () => getWorkspaceById(workspaceId!),
-    enabled: !!workspaceId,
+    enabled: !!user?.id && !!workspaceId,
   });
 
   const { data: projectResponse } = useQuery({
-    queryKey: ['project', workspaceId, projectId],
+    queryKey: ['project', user?.id, workspaceId, projectId],
     queryFn: () => getProjectById(workspaceId!, projectId!),
-    enabled: !!workspaceId && !!projectId,
+    enabled: !!user?.id && !!workspaceId && !!projectId,
   });
 
   const { data: tasksResponse, isLoading } = useQuery({
-    queryKey: ['tasks', projectId],
+    queryKey: ['tasks', user?.id, projectId],
     queryFn: () => getTasks(projectId!),
-    enabled: !!projectId,
+    enabled: !!user?.id && !!projectId,
   });
 
   const workspace = (workspaceResponse as any)?.data?.workspace;
@@ -268,21 +270,23 @@ function TaskDetailSlideOver({ taskId, projectId, onClose }: SlideOverProps) {
   const [editValue, setEditValue] = useState('');
 
 
+  const { user } = useAuthStore();
   const { data: taskResponse, isLoading: taskLoading } = useQuery({
-    queryKey: ['task', taskId],
+    queryKey: ['task', user?.id, taskId],
     queryFn: () => getTasks(projectId).then(res => res.data.tasks.find((t: any) => t.id === taskId)),
+    enabled: !!user?.id,
   });
 
   const { data: commentsResponse } = useQuery({
-    queryKey: ['comments', taskId],
+    queryKey: ['comments', user?.id, taskId],
     queryFn: () => getComments(projectId, taskId),
-    enabled: !!taskId,
+    enabled: !!user?.id && !!taskId,
   });
 
   const { data: membersResponse } = useQuery({
-    queryKey: ['workspace-members', workspaceId],
+    queryKey: ['workspace-members', user?.id, workspaceId],
     queryFn: () => getWorkspaceMembers(workspaceId!),
-    enabled: !!workspaceId,
+    enabled: !!user?.id && !!workspaceId,
   });
 
   const task = taskResponse;

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Users, Layout as LayoutIcon, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getWorkspaces, createWorkspace } from '../../api/workspaces';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { Workspace } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
@@ -17,9 +18,11 @@ export default function Workspaces() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const user = useAuthStore((state) => state.user);
   const { data: workspacesResponse, isLoading } = useQuery({
-    queryKey: ['workspaces'],
+    queryKey: ['workspaces', user?.id],
     queryFn: getWorkspaces,
+    enabled: !!user?.id,
   });
 
   const workspaces = (workspacesResponse as any)?.data?.workspaces || [];
